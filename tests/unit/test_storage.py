@@ -10,7 +10,6 @@ also satisfy the POSIX requirement.
 from __future__ import annotations
 
 import io
-import os
 import sys
 import threading
 import time
@@ -24,8 +23,7 @@ pytestmark = pytest.mark.skipif(
     reason="storage module requires POSIX fcntl (Linux/macOS)",
 )
 
-from ephemeral_sites import storage, validator
-
+from ephemeral_sites import storage, validator  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers — build ZIPs + ValidationResult fixtures in a way that mirrors
@@ -38,12 +36,12 @@ _DEFAULT_EXTS = frozenset({".html", ".css", ".js", ".txt", ".json", ".png"})
 
 
 def _cfg(**overrides) -> validator.ValidatorConfig:
-    defaults = dict(
-        max_zip_size=10 * 1024 * 1024,
-        max_files_per_site=1000,
-        max_decompression_ratio=1000,
-        allowed_extensions=_DEFAULT_EXTS,
-    )
+    defaults: dict = {
+        "max_zip_size": 10 * 1024 * 1024,
+        "max_files_per_site": 1000,
+        "max_decompression_ratio": 1000,
+        "allowed_extensions": _DEFAULT_EXTS,
+    }
     defaults.update(overrides)
     return validator.ValidatorConfig(**defaults)
 
@@ -168,9 +166,7 @@ def test_extract_site_no_config_json_when_runtime_config_none(tmp_path: Path):
 
 
 def test_extract_site_returns_populated_result(tmp_path: Path):
-    data, result = _validated(
-        {"index.html": "<html></html>", "static/app.js": "x = 1;"}
-    )
+    data, result = _validated({"index.html": "<html></html>", "static/app.js": "x = 1;"})
     extraction = storage.extract_site(
         sites_root=tmp_path / "sites",
         slug="demo",
@@ -215,13 +211,9 @@ def test_extract_site_leaves_no_old_dir_after_success(tmp_path: Path):
 def test_extract_site_redeploy_replaces_content(tmp_path: Path):
     sites_root = tmp_path / "sites"
     data1, r1 = _validated({"index.html": "<html>v1</html>"})
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data1, validation=r1
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data1, validation=r1)
     data2, r2 = _validated({"index.html": "<html>v2</html>"})
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data2, validation=r2
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data2, validation=r2)
     assert (sites_root / "demo" / "index.html").read_text() == "<html>v2</html>"
 
 
@@ -233,14 +225,10 @@ def test_extract_site_redeploy_drops_files_not_in_new_archive(tmp_path: Path):
             "legacy.txt": "goodbye",
         }
     )
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data1, validation=r1
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data1, validation=r1)
     # Second deploy does NOT include legacy.txt.
     data2, r2 = _validated({"index.html": "<html>v2</html>"})
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data2, validation=r2
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data2, validation=r2)
     assert not (sites_root / "demo" / "legacy.txt").exists()
 
 
@@ -271,9 +259,7 @@ def test_extract_site_rollback_leaves_existing_site_untouched_on_failure(tmp_pat
     sites_root = tmp_path / "sites"
     # First deploy succeeds.
     data1, r1 = _validated({"index.html": "<html>v1</html>"})
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data1, validation=r1
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data1, validation=r1)
     # Second deploy fails (corrupted bytes).
     _, r2 = _validated({"index.html": "<html>v2</html>"})
     with pytest.raises(storage.ExtractionError):
@@ -322,23 +308,34 @@ def test_extract_site_rejects_path_escaping_site_dir(tmp_path: Path):
     assert not (tmp_path / "escaped.html").exists()
 
 
-def test_extract_site_raises_extraction_error_on_io_failure(tmp_path: Path):
-    """Any OSError during extraction is wrapped as ExtractionError."""
+def test_extract_site_raises_extraction_error_on_io_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Any OSError during extraction is wrapped as ExtractionError.
+
+    We cannot use `chmod 0o500` in a test running as root (root bypasses
+    DAC permissions), so we monkeypatch shutil.copyfileobj inside the
+    storage module to raise — which simulates a disk-full / I/O error
+    during the write phase.
+    """
     data, result = _validated({"index.html": "<html></html>"})
-    # Make sites_root read-only so mkdir fails.
     sites_root = tmp_path / "sites"
-    sites_root.mkdir()
-    os.chmod(sites_root, 0o500)  # r-x (no write)
-    try:
-        with pytest.raises(storage.ExtractionError):
-            storage.extract_site(
-                sites_root=sites_root,
-                slug="demo",
-                zip_source=data,
-                validation=result,
-            )
-    finally:
-        os.chmod(sites_root, 0o700)
+
+    def bomb(*args, **kwargs):
+        raise OSError("simulated disk full")
+
+    monkeypatch.setattr(storage.shutil, "copyfileobj", bomb)
+
+    with pytest.raises(storage.ExtractionError):
+        storage.extract_site(
+            sites_root=sites_root,
+            slug="demo",
+            zip_source=data,
+            validation=result,
+        )
+    # After rollback, no .new dir is left behind.
+    assert not (sites_root / "demo.new").exists()
+    assert not (sites_root / "demo").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -389,9 +386,7 @@ def test_extract_site_parallel_different_slugs_do_not_block(tmp_path: Path):
     data, result = _validated({"index.html": "<html></html>"})
 
     def deploy(slug: str) -> None:
-        storage.extract_site(
-            sites_root=sites_root, slug=slug, zip_source=data, validation=result
-        )
+        storage.extract_site(sites_root=sites_root, slug=slug, zip_source=data, validation=result)
 
     # Warm up: one solo deploy to measure baseline.
     t0 = time.monotonic()
@@ -401,8 +396,10 @@ def test_extract_site_parallel_different_slugs_do_not_block(tmp_path: Path):
     t0 = time.monotonic()
     t1 = threading.Thread(target=deploy, args=("a",))
     t2 = threading.Thread(target=deploy, args=("b",))
-    t1.start(); t2.start()
-    t1.join(); t2.join()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
     parallel = time.monotonic() - t0
     # Parallel must not be dramatically slower than solo. Loose bound to
     # avoid CI flakiness: parallel <= solo * 3.
@@ -430,9 +427,7 @@ def test_overwrite_no_404_window(tmp_path: Path):
     sites_root = tmp_path / "sites"
     # Seed initial deploy.
     data0, r0 = _validated({"index.html": "<html>v0</html>"})
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data0, validation=r0
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data0, validation=r0)
 
     stop = threading.Event()
     successes = [0]
@@ -455,9 +450,7 @@ def test_overwrite_no_404_window(tmp_path: Path):
         while time.monotonic() < end:
             i += 1
             data, r = _validated({"index.html": f"<html>v{i}</html>"})
-            storage.extract_site(
-                sites_root=sites_root, slug="demo", zip_source=data, validation=r
-            )
+            storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data, validation=r)
     finally:
         stop.set()
         t.join(timeout=5)
@@ -479,9 +472,7 @@ def test_overwrite_no_404_window(tmp_path: Path):
 def test_delete_site_removes_existing(tmp_path: Path):
     sites_root = tmp_path / "sites"
     data, result = _validated({"index.html": "<html></html>"})
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data, validation=result
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data, validation=result)
     assert (sites_root / "demo").exists()
     assert storage.delete_site(sites_root=sites_root, slug="demo") is True
     assert not (sites_root / "demo").exists()
@@ -498,9 +489,7 @@ def test_delete_site_serializes_with_extract(tmp_path: Path):
     sites_root = tmp_path / "sites"
     data, result = _validated({"index.html": "<html></html>"})
     # Seed a site so the first extract_site has .old to clean up.
-    storage.extract_site(
-        sites_root=sites_root, slug="demo", zip_source=data, validation=result
-    )
+    storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data, validation=result)
 
     order: list[str] = []
     extract_started = threading.Event()
@@ -511,9 +500,7 @@ def test_delete_site_serializes_with_extract(tmp_path: Path):
         # assert delete completes AFTER it (observable ordering).
         extract_started.set()
         time.sleep(0.05)  # small window to let the delete contend the lock
-        storage.extract_site(
-            sites_root=sites_root, slug="demo", zip_source=data, validation=result
-        )
+        storage.extract_site(sites_root=sites_root, slug="demo", zip_source=data, validation=result)
         order.append("extract")
 
     def racing_delete() -> None:
@@ -523,8 +510,10 @@ def test_delete_site_serializes_with_extract(tmp_path: Path):
 
     t1 = threading.Thread(target=slow_extract)
     t2 = threading.Thread(target=racing_delete)
-    t1.start(); t2.start()
-    t1.join(); t2.join()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
     # Both completed, no crash, no leftover tmp dirs.
     assert not (sites_root / "demo.new").exists()
     assert not (sites_root / "demo.old").exists()
