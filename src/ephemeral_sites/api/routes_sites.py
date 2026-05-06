@@ -23,15 +23,21 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi import Path as PathParam
 
 from ephemeral_sites import auth, quota, storage, validator
+from ephemeral_sites import slug as slug_module
 from ephemeral_sites.config import Settings
 
-from .deps import get_db_conn, get_settings_dep, require_auth
+from .deps import get_api_keys, get_db_conn, get_settings_dep, require_auth
 from .errors import InvalidTtl, MalformedField, PayloadTooLarge
-from .models import SiteResponse
+from .models import (
+    ListSitesResponse,
+    PatchSiteRequest,
+    SiteMetadataResponse,
+    SiteResponse,
+)
 
 __all__ = ["router"]
 
@@ -291,3 +297,328 @@ async def put_site(
     finally:
         with contextlib.suppress(FileNotFoundError):
             tmp_path.unlink()
+
+
+# ---------------------------------------------------------------------------
+# Helpers for CRUD routes (step 9)
+# ---------------------------------------------------------------------------
+
+
+_SITE_COLUMNS = (
+    "slug, path, created_at, updated_at, expires_at, size_bytes, files_count, "
+    "password_hash, delete_token_hash, spa_mode, allow_indexing, hits, last_hit, "
+    "created_by, labels, runtime_config"
+)
+
+
+def _row_to_metadata(row, base_domain: str) -> SiteMetadataResponse:
+    """Map a ``sites`` row (sqlite3.Row) to the public metadata response.
+
+    Never exposes ``password_hash`` or ``delete_token_hash``.
+    """
+    labels_list: list[str] | None = None
+    if row["labels"]:
+        try:
+            decoded = json.loads(row["labels"])
+            if isinstance(decoded, list):
+                labels_list = [str(x) for x in decoded]
+        except (TypeError, ValueError):
+            labels_list = None
+
+    return SiteMetadataResponse(
+        slug=row["slug"],
+        url=f"https://{row['slug']}.{base_domain}",
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        expires_at=row["expires_at"],
+        size_bytes=row["size_bytes"],
+        files_count=row["files_count"],
+        spa_mode=bool(row["spa_mode"]),
+        password_protected=row["password_hash"] is not None,
+        allow_indexing=bool(row["allow_indexing"]),
+        labels=labels_list,
+        hits=row["hits"] or 0,
+        last_hit=row["last_hit"],
+    )
+
+
+def _fetch_site_row(conn: sqlite3.Connection, slug: str):
+    return conn.execute(
+        f"SELECT {_SITE_COLUMNS} FROM sites WHERE slug = ?",  # noqa: S608
+        (slug,),
+    ).fetchone()
+
+
+# ---------------------------------------------------------------------------
+# POST — auto-slug create
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "",
+    response_model=SiteResponse,
+    status_code=201,
+)
+async def post_site(
+    request: Request,
+    file: UploadFile = File(...),
+    ttl_seconds: int = Form(None),
+    password: str | None = Form(None),
+    spa_mode: bool = Form(True),
+    runtime_config: str | None = Form(None),
+    allow_indexing: bool = Form(False),
+    labels: str | None = Form(None),
+    api_key: auth.ApiKey = Depends(require_auth),
+    settings: Settings = Depends(get_settings_dep),
+    conn: sqlite3.Connection = Depends(get_db_conn),
+) -> SiteResponse:
+    """Create a site under an auto-generated slug (master spec §5.3)."""
+
+    def _is_taken(candidate: str) -> bool:
+        row = conn.execute("SELECT 1 FROM sites WHERE slug = ? LIMIT 1", (candidate,)).fetchone()
+        return row is not None
+
+    try:
+        generated = slug_module.generate_unique_slug(_is_taken)
+    except slug_module.SlugCollisionError as exc:
+        log.error("slug collision: exhausted retries: %s", exc)
+        raise HTTPException(status_code=500, detail="slug_collision_exhausted") from exc
+
+    # Reuse the PUT handler's path by calling put_site with the generated slug.
+    # FastAPI handlers can be invoked as plain coroutines; we do that here to
+    # avoid duplicating the 100-line upsert pipeline.
+    resp = await put_site(
+        request=request,
+        slug=generated,
+        file=file,
+        ttl_seconds=ttl_seconds,
+        password=password,
+        spa_mode=spa_mode,
+        runtime_config=runtime_config,
+        allow_indexing=allow_indexing,
+        labels=labels,
+        api_key=api_key,
+        settings=settings,
+        conn=conn,
+    )
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# GET — single site metadata
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{slug}", response_model=SiteMetadataResponse)
+async def get_site(
+    slug: str = PathParam(...),
+    api_key: auth.ApiKey = Depends(require_auth),
+    settings: Settings = Depends(get_settings_dep),
+    conn: sqlite3.Connection = Depends(get_db_conn),
+) -> SiteMetadataResponse:
+    slug_module.validate_slug(slug)
+    row = _fetch_site_row(conn, slug)
+    if row is None:
+        raise HTTPException(status_code=404, detail="not_found")
+    return _row_to_metadata(row, settings.base_domain)
+
+
+# ---------------------------------------------------------------------------
+# DELETE — bearer OR X-Delete-Token
+# ---------------------------------------------------------------------------
+
+
+def _authorize_delete(
+    request: Request,
+    slug: str,
+    conn: sqlite3.Connection,
+    keys: tuple[auth.ApiKey, ...],
+) -> str:
+    """Returns 'manual' if bearer auth succeeded, 'token' if delete-token matched.
+
+    Raises the appropriate auth exception otherwise.
+    """
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        token = auth.parse_bearer_header(auth_header)
+        key = auth.authenticate(token, keys)
+        request.state.api_key_name = key.name
+        return "manual"
+
+    token_header = request.headers.get("X-Delete-Token")
+    if token_header:
+        row = conn.execute("SELECT delete_token_hash FROM sites WHERE slug = ?", (slug,)).fetchone()
+        if row is None:
+            # Treat as 401 — we don't reveal whether the slug exists.
+            raise auth.InvalidApiKey("delete token does not match")
+        stored_hash = row["delete_token_hash"]
+        if isinstance(stored_hash, str):
+            stored_hash = stored_hash.encode("utf-8")
+        if auth.verify_delete_token(token_header, stored_hash):
+            return "token"
+        raise auth.InvalidApiKey("delete token does not match")
+
+    raise auth.InvalidAuthHeader("no Authorization or X-Delete-Token header")
+
+
+@router.delete("/{slug}", status_code=204)
+async def delete_site_route(
+    request: Request,
+    slug: str = PathParam(...),
+    settings: Settings = Depends(get_settings_dep),
+    conn: sqlite3.Connection = Depends(get_db_conn),
+    keys: tuple[auth.ApiKey, ...] = Depends(get_api_keys),
+):
+    slug_module.validate_slug(slug)
+
+    # First, authorize. Bearer always wins if both headers are present.
+    reason = _authorize_delete(request, slug, conn, keys)
+
+    # Check existence AFTER auth (auth result depends on the slug for token path).
+    row = _fetch_site_row(conn, slug)
+    if row is None:
+        raise HTTPException(status_code=404, detail="not_found")
+
+    storage.delete_site(
+        sites_root=settings.sites_root,
+        slug=slug,
+        lock_dir=settings.lock_dir,
+    )
+
+    with conn:
+        conn.execute("DELETE FROM sites WHERE slug = ?", (slug,))
+        conn.execute(
+            "INSERT INTO event_log (slug, event, timestamp, api_key, metadata) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                slug,
+                "deleted",
+                _iso_utc_now(),
+                getattr(request.state, "api_key_name", None),
+                json.dumps({"reason": reason}),
+            ),
+        )
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# PATCH — metadata-only mutation
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/{slug}", response_model=SiteMetadataResponse)
+async def patch_site(
+    request: Request,
+    body: PatchSiteRequest,
+    slug: str = PathParam(...),
+    api_key: auth.ApiKey = Depends(require_auth),
+    settings: Settings = Depends(get_settings_dep),
+    conn: sqlite3.Connection = Depends(get_db_conn),
+) -> SiteMetadataResponse:
+    slug_module.validate_slug(slug)
+
+    row = _fetch_site_row(conn, slug)
+    if row is None:
+        raise HTTPException(status_code=404, detail="not_found")
+
+    # Determine which fields were actually set by the caller (Pydantic v2:
+    # model_fields_set reflects what was in the JSON body).
+    set_fields = body.model_fields_set
+
+    updates: dict[str, object] = {}
+
+    if "ttl_seconds" in set_fields:
+        ttl = body.ttl_seconds
+        if ttl is not None:
+            _validate_ttl(ttl, settings)
+            now_iso = _iso_utc_now()
+            updates["expires_at"] = _compute_expires_at(ttl_seconds=ttl, now_iso=now_iso)
+
+    if "password" in set_fields:
+        if body.password is None:
+            updates["password_hash"] = None
+        else:
+            if body.password == "":
+                raise InvalidTtl("password must be non-empty")
+            updates["password_hash"] = auth.hash_secret(
+                body.password, rounds=settings.bcrypt_rounds
+            ).decode("utf-8")
+
+    if "allow_indexing" in set_fields and body.allow_indexing is not None:
+        updates["allow_indexing"] = 1 if body.allow_indexing else 0
+
+    if "labels" in set_fields:
+        updates["labels"] = json.dumps(list(body.labels)) if body.labels is not None else None
+
+    if updates:
+        updates["updated_at"] = _iso_utc_now()
+        assignments = ", ".join(f"{col} = ?" for col in updates)
+        params = list(updates.values()) + [slug]
+        with conn:
+            conn.execute(
+                f"UPDATE sites SET {assignments} WHERE slug = ?",  # noqa: S608
+                params,
+            )
+
+    # Return fresh row
+    new_row = _fetch_site_row(conn, slug)
+    return _row_to_metadata(new_row, settings.base_domain)
+
+
+# ---------------------------------------------------------------------------
+# LIST
+# ---------------------------------------------------------------------------
+
+
+_VALID_SORT_FIELDS = {"created_at", "updated_at", "expires_at", "slug"}
+
+
+@router.get("", response_model=ListSitesResponse)
+async def list_sites(
+    label: str | None = Query(default=None),
+    limit: int = Query(default=50),
+    offset: int = Query(default=0),
+    sort: str = Query(default="-created_at"),
+    api_key: auth.ApiKey = Depends(require_auth),
+    settings: Settings = Depends(get_settings_dep),
+    conn: sqlite3.Connection = Depends(get_db_conn),
+) -> ListSitesResponse:
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=400, detail="limit must be in [1, 200]")
+    if offset < 0:
+        raise HTTPException(status_code=400, detail="offset must be >= 0")
+
+    # Parse sort
+    desc = sort.startswith("-")
+    sort_field = sort[1:] if desc else sort
+    if sort_field not in _VALID_SORT_FIELDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"sort must be one of {sorted(_VALID_SORT_FIELDS)}",
+        )
+    order_clause = f"{sort_field} {'DESC' if desc else 'ASC'}"
+
+    where = ""
+    params: list = []
+    if label is not None:
+        # SQLite JSON1 extension may not be guaranteed; use LIKE on the JSON text.
+        # Match a quoted string inside the JSON array: "label".
+        where = "WHERE labels LIKE ?"
+        params.append(f'%"{label}"%')
+
+    total_row = conn.execute(
+        f"SELECT COUNT(*) FROM sites {where}",  # noqa: S608
+        params,
+    ).fetchone()
+    total = int(total_row[0])
+
+    params_with_paging = params + [limit, offset]
+    rows = conn.execute(
+        f"SELECT {_SITE_COLUMNS} FROM sites {where} ORDER BY {order_clause} "  # noqa: S608
+        "LIMIT ? OFFSET ?",
+        params_with_paging,
+    ).fetchall()
+
+    items = [_row_to_metadata(r, settings.base_domain) for r in rows]
+    return ListSitesResponse(total=total, items=items)

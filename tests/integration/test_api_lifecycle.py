@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 
-
 # ---------------------------------------------------------------------------
 # Lifecycle — master spec section 11.3 test_post_get_patch_delete
 # ---------------------------------------------------------------------------
@@ -81,9 +80,7 @@ def test_get_without_auth_returns_401(api_client):
     assert r.status_code == 401
 
 
-def test_get_returns_metadata_without_delete_token(
-    api_client, auth_headers, tiny_valid_zip
-):
+def test_get_returns_metadata_without_delete_token(api_client, auth_headers, tiny_valid_zip):
     api_client.put(
         "/api/v1/sites/demo",
         headers=auth_headers,
@@ -138,9 +135,7 @@ def test_delete_with_valid_delete_token_succeeds(
     )
     token = r_put.json()["delete_token"]
 
-    r = api_client.delete(
-        "/api/v1/sites/demo", headers={"X-Delete-Token": token}
-    )
+    r = api_client.delete("/api/v1/sites/demo", headers={"X-Delete-Token": token})
     assert r.status_code == 204
 
     conn = open_conn()
@@ -153,17 +148,13 @@ def test_delete_with_valid_delete_token_succeeds(
         conn.close()
 
 
-def test_delete_with_wrong_delete_token_returns_401(
-    api_client, auth_headers, tiny_valid_zip
-):
+def test_delete_with_wrong_delete_token_returns_401(api_client, auth_headers, tiny_valid_zip):
     api_client.put(
         "/api/v1/sites/demo",
         headers=auth_headers,
         files={"file": ("spa.zip", tiny_valid_zip, "application/zip")},
     )
-    r = api_client.delete(
-        "/api/v1/sites/demo", headers={"X-Delete-Token": "dt_wrongtoken123"}
-    )
+    r = api_client.delete("/api/v1/sites/demo", headers={"X-Delete-Token": "dt_wrongtoken123"})
     assert r.status_code == 401
 
 
@@ -233,9 +224,7 @@ def test_patch_password_sets_and_clears(api_client, auth_headers, tiny_valid_zip
     assert r_clear.json()["password_protected"] is False
 
 
-def test_patch_password_empty_string_returns_400(
-    api_client, auth_headers, tiny_valid_zip
-):
+def test_patch_password_empty_string_returns_400(api_client, auth_headers, tiny_valid_zip):
     api_client.put(
         "/api/v1/sites/demo",
         headers=auth_headers,
@@ -296,9 +285,7 @@ def test_list_empty(api_client, auth_headers):
     assert body["items"] == []
 
 
-def test_list_three_sites_default_sort_desc_created(
-    api_client, auth_headers, tiny_valid_zip
-):
+def test_list_three_sites_default_sort_desc_created(api_client, auth_headers, tiny_valid_zip):
     import time
 
     for slug in ("alpha", "bravo", "charlie"):
@@ -321,7 +308,7 @@ def test_list_three_sites_default_sort_desc_created(
 def test_list_limit_and_offset(api_client, auth_headers, tiny_valid_zip):
     import time
 
-    for slug in ("a1", "b2", "c3"):
+    for slug in ("aaa", "bbb", "ccc"):
         api_client.put(
             f"/api/v1/sites/{slug}",
             headers=auth_headers,
@@ -357,7 +344,7 @@ def test_list_filter_by_label(api_client, auth_headers, tiny_valid_zip):
 
 
 def test_list_sort_by_slug_asc(api_client, auth_headers, tiny_valid_zip):
-    for slug in ("zeta", "alpha", "mu"):
+    for slug in ("zeta", "alpha", "mid"):
         api_client.put(
             f"/api/v1/sites/{slug}",
             headers=auth_headers,
@@ -366,7 +353,7 @@ def test_list_sort_by_slug_asc(api_client, auth_headers, tiny_valid_zip):
 
     r = api_client.get("/api/v1/sites?sort=slug", headers=auth_headers)
     body = r.json()
-    assert [it["slug"] for it in body["items"]] == ["alpha", "mu", "zeta"]
+    assert [it["slug"] for it in body["items"]] == ["alpha", "mid", "zeta"]
 
 
 def test_list_limit_over_max_returns_400(api_client, auth_headers):

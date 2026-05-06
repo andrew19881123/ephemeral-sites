@@ -201,12 +201,32 @@ async def _handle_request_validation(request: Request, exc: RequestValidationErr
     )
 
 
+_HTTP_ERROR_SLUGS = {
+    400: "bad_request",
+    404: "not_found",
+    405: "method_not_allowed",
+    409: "conflict",
+    422: "request_validation",
+}
+
+
 async def _handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    # If the raiser provided a slug-like detail (e.g. "not_found", "invalid_slug"),
+    # prefer that over the generic status-based slug — HTTPException(detail="...") is
+    # our idiomatic way to pick the error slug.
+    detail = exc.detail
+    if isinstance(detail, str) and detail and all(c.isalnum() or c in "_-" for c in detail):
+        slug = detail
+        human = detail.replace("_", " ")
+    else:
+        slug = _HTTP_ERROR_SLUGS.get(exc.status_code, f"http_{exc.status_code}")
+        human = str(detail) if detail else slug.replace("_", " ")
+
     return _error_json(
         request,
         status=exc.status_code,
-        error=f"http_{exc.status_code}",
-        detail=str(exc.detail),
+        error=slug,
+        detail=human,
     )
 
 
