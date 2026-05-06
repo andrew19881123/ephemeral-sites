@@ -234,12 +234,12 @@ def test_validate_slug_rejects_dots_and_slashes(bad: str):
 
 
 def test_wordlists_minimum_size():
-    assert (
-        len(DEFAULT_ADJECTIVES) >= 64
-    ), f"DEFAULT_ADJECTIVES has {len(DEFAULT_ADJECTIVES)} entries, expected ≥ 64"
-    assert (
-        len(DEFAULT_NOUNS) >= 64
-    ), f"DEFAULT_NOUNS has {len(DEFAULT_NOUNS)} entries, expected ≥ 64"
+    assert len(DEFAULT_ADJECTIVES) >= 64, (
+        f"DEFAULT_ADJECTIVES has {len(DEFAULT_ADJECTIVES)} entries, expected ≥ 64"
+    )
+    assert len(DEFAULT_NOUNS) >= 64, (
+        f"DEFAULT_NOUNS has {len(DEFAULT_NOUNS)} entries, expected ≥ 64"
+    )
 
 
 @pytest.mark.parametrize(

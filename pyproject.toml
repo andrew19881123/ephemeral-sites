@@ -77,10 +77,12 @@ select = [
 ignore = [
     "S101",  # use of assert (fine in tests)
     "E501",  # line too long (handled by formatter)
+    "B008",  # function-call in default argument — idiomatic for FastAPI Depends()
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S", "B"]
+"src/ephemeral_sites/auth.py" = ["S105"]  # "dt_" is a prefix constant, not a password
 
 [tool.ruff.format]
 quote-style = "double"

@@ -404,8 +404,7 @@ def test_extract_site_parallel_different_slugs_do_not_block(tmp_path: Path):
     # Parallel must not be dramatically slower than solo. Loose bound to
     # avoid CI flakiness: parallel <= solo * 3.
     assert parallel <= max(solo * 3.0, 0.5), (
-        f"parallel slug deploys serialized unexpectedly: solo={solo:.3f}s, "
-        f"parallel={parallel:.3f}s"
+        f"parallel slug deploys serialized unexpectedly: solo={solo:.3f}s, parallel={parallel:.3f}s"
     )
     assert (sites_root / "a" / "index.html").exists()
     assert (sites_root / "b" / "index.html").exists()

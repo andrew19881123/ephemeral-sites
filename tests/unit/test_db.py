@@ -228,7 +228,7 @@ def test_schema_creates_expected_indexes(tmp_path: Path):
         idxs = {
             row[0]
             for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='index' " "AND name NOT LIKE 'sqlite_%'"
+                "SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
         expected = {
@@ -246,7 +246,7 @@ def test_idx_sites_expires_is_partial(tmp_path: Path):
     conn = db.open_db(tmp_path / "a.db")
     try:
         sql = conn.execute(
-            "SELECT sql FROM sqlite_master " "WHERE type='index' AND name='idx_sites_expires'"
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_sites_expires'"
         ).fetchone()[0]
         # Partial index must contain a WHERE clause against expires_at.
         assert "WHERE" in sql.upper()
@@ -330,9 +330,9 @@ def test_run_migrations_creates_backup_before_applying(tmp_path: Path):
         conn.close()
 
     backups = list(backup_dir.iterdir())
-    assert any(
-        p.name.startswith("ephemeral-sites.db.backup-v0") for p in backups
-    ), f"expected backup file starting with backup-v0, got {[p.name for p in backups]}"
+    assert any(p.name.startswith("ephemeral-sites.db.backup-v0") for p in backups), (
+        f"expected backup file starting with backup-v0, got {[p.name for p in backups]}"
+    )
 
 
 def test_run_migrations_skips_backup_when_backup_dir_none(tmp_path: Path):
@@ -380,9 +380,9 @@ def test_run_migrations_rolls_back_on_failure(tmp_path: Path):
 
 def test_migrations_registry_is_strictly_linear():
     versions = [m.target_version for m in db.MIGRATIONS]
-    assert versions == list(
-        range(1, len(versions) + 1)
-    ), f"MIGRATIONS versions not strictly linear: {versions}"
+    assert versions == list(range(1, len(versions) + 1)), (
+        f"MIGRATIONS versions not strictly linear: {versions}"
+    )
 
 
 # ---------------------------------------------------------------------------

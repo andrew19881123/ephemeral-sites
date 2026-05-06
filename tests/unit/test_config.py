@@ -5,8 +5,6 @@ Red tests for step 8; see ``docs/steps/step-8-api-put-upsert.md`` §3.1.
 
 from __future__ import annotations
 
-import pytest
-
 
 def test_settings_defaults_match_spec(monkeypatch):
     """With no env set, Settings() returns master-spec §9 defaults."""

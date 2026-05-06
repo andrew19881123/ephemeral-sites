@@ -47,9 +47,9 @@ def settings(sites_root: Path, db_path: Path):
         db_path=str(db_path),
         sites_root=str(sites_root),
         lock_dir=str(sites_root / ".lock"),
-        max_zip_size=1024 * 1024,  # 1 MiB plenty for fixtures
+        max_zip_size=5 * 1024 * 1024,  # 5 MiB — headroom for ratio checks
         max_files_per_site=50,
-        max_total_storage_bytes=10 * 1024 * 1024,  # 10 MiB — easy to saturate
+        max_total_storage_bytes=3 * 1024 * 1024,  # 3 MiB — easy to saturate
         max_decompression_ratio=100,
         default_ttl_seconds=3600,
         max_ttl_seconds=7 * 24 * 3600,

@@ -15,15 +15,11 @@ from __future__ import annotations
 
 import os
 import platform
-import sqlite3
-import sys
 import threading
 import time
 import zipfile
-from pathlib import Path
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # §3.2 Happy path — master-spec "test_put_creates_site"
@@ -64,7 +60,8 @@ def test_put_creates_site(api_client, auth_headers, tiny_valid_zip, open_conn, s
 
         from ephemeral_sites import auth
 
-        assert auth.verify_delete_token(body["delete_token"], delete_hash)
+        hash_bytes = delete_hash.encode("utf-8") if isinstance(delete_hash, str) else delete_hash
+        assert auth.verify_delete_token(body["delete_token"], hash_bytes)
 
         evt = conn.execute(
             "SELECT event FROM event_log WHERE slug='demo' ORDER BY id ASC"
@@ -233,9 +230,7 @@ def test_put_invalid_slug_returns_400(api_client, auth_headers, tiny_valid_zip):
 
 
 @pytest.mark.security
-def test_put_path_traversal_zip_returns_400_no_filename_leak(
-    api_client, auth_headers, build_zip
-):
+def test_put_path_traversal_zip_returns_400_no_filename_leak(api_client, auth_headers, build_zip):
     """The error 'detail' must NOT echo the attacker-controlled entry name."""
     import io
 
@@ -285,9 +280,7 @@ def test_put_ttl_minus_one_permanent_stored_as_null(
 
     conn = open_conn()
     try:
-        row = conn.execute(
-            "SELECT expires_at FROM sites WHERE slug='permasite'"
-        ).fetchone()
+        row = conn.execute("SELECT expires_at FROM sites WHERE slug='permasite'").fetchone()
         assert row is not None and row[0] is None
     finally:
         conn.close()
@@ -298,7 +291,7 @@ def test_put_zip_over_max_size_returns_413(api_client, auth_headers, settings, b
     # Build a payload larger than settings.max_zip_size. We squeeze incompressible
     # random-ish data through deflate so the compressed stream still exceeds the cap.
     big = os.urandom(settings.max_zip_size + 2048)
-    oversize = build_zip({"index.html": b"<html></html>", "blob.bin": big})
+    oversize = build_zip({"index.html": b"<html></html>", "blob.txt": big})
     assert len(oversize) > settings.max_zip_size
 
     resp = api_client.put(
@@ -321,32 +314,29 @@ def test_put_over_quota_returns_507_no_leftover_new_dirs(
     api_client, auth_headers, build_zip, sites_root, settings
 ):
     """Fill the quota then attempt another PUT; expect 507 and no *.new leftovers."""
-    # The initial PUT uses ~most of the quota. We size the zip payload with a
-    # single large file of roughly max_total_storage_bytes bytes.
-    big_bytes = b"A" * (settings.max_total_storage_bytes - 1024)
-    filler = build_zip({"index.html": b"<html></html>", "data.bin": big_bytes})
+    # Use incompressible random bytes so compressed == uncompressed (no ratio
+    # bomb false-positive). First upload consumes ~85% of the quota.
+    first_size = int(settings.max_total_storage_bytes * 0.85)
+    filler_bytes = os.urandom(first_size)
+    filler = build_zip({"index.html": b"<html></html>", "data.txt": filler_bytes})
+    assert len(filler) <= settings.max_zip_size, "filler must fit under max_zip_size"
 
     r1 = api_client.put(
         "/api/v1/sites/filler",
         headers=auth_headers,
         files={"file": ("filler.zip", filler, "application/zip")},
     )
-    # The filler itself might not fit under single-file / ratio caps; if it
-    # doesn't, we skip the quota test for this config (not all settings combos
-    # can produce a borderline fill). Assert 200 first; if 400, skip.
-    if r1.status_code != 200:
-        pytest.skip(
-            f"filler upload did not fit under validator caps (got {r1.status_code}); "
-            "tune settings to exercise quota path"
-        )
+    assert r1.status_code == 200, f"first upload should succeed: {r1.status_code} {r1.text}"
 
-    second = build_zip({"index.html": b"<html></html>", "more.bin": b"B" * (2 * 1024 * 1024)})
+    # Second upload: ~30% of quota — together with the first, pushes over cap.
+    second_size = int(settings.max_total_storage_bytes * 0.30)
+    second = build_zip({"index.html": b"<html></html>", "more.txt": os.urandom(second_size)})
     r2 = api_client.put(
         "/api/v1/sites/overflow",
         headers=auth_headers,
         files={"file": ("overflow.zip", second, "application/zip")},
     )
-    assert r2.status_code == 507
+    assert r2.status_code == 507, r2.text
     assert r2.json()["error"] == "quota_exceeded"
 
     # No stray *.new directories under /data/sites
