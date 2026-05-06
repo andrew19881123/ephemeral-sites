@@ -87,3 +87,8 @@ logs/
 
 # OS
 Thumbs.db
+
+# Sandbox-only: when this repo is checked out inside the Claude chat
+# sandbox, Telegram-uploaded files land in ./uploads/. They are NOT part
+# of the project.
+uploads/
