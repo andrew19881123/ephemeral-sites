@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§5.2 path param regex](../SPEC.md), [§5.3 POST /api/v1/sites](../SPEC.md), [§11.3 test_slug](../SPEC.md)
 **Roadmap entry**: [§16.1 step 3](../SPEC.md)
-**Status**: 🟡 Approved, in progress
+**Status**: ✅ Complete (2026-05-06, commit `d0a3026`)
 **Owner**: Andrea Veronesi
 
 ---

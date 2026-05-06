@@ -340,8 +340,8 @@ The 18-step sequence is in [`docs/SPEC.md` §16.1](docs/SPEC.md). Current status
 |------|-------------|--------|
 | 1 | Scaffolding (pyproject, Dockerfile, CI, smoke tests) | ✅ Done — commit `08bf382` |
 | 2 | ZIP validator (30 tests, 95% cov) | ✅ Done — `d6cddae` (mini-spec), `b1df6a2` (red), `f612aca` (feat) |
-| 3 | Slug generator | ⏳ Next |
-| 4 | DB + migrations | Pending |
+| 3 | Slug generator (32 tests, 100% cov) | ✅ Done — `2cb5c21` (mini-spec), `df55898` (red), `d0a3026` (feat) |
+| 4 | DB + migrations | ⏳ Next |
 | 5 | Storage atomic swap | Pending |
 | 6 | Auth (bcrypt, API key, delete token) | Pending |
 | 7 | Quota check | Pending |
