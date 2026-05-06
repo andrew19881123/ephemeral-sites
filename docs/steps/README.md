@@ -24,5 +24,5 @@ docs(step-N): mini-spec for <name>
 | 4 | [`step-4-db-migrations.md`](step-4-db-migrations.md) | ✅ Done |
 | 5 | [`step-5-storage.md`](step-5-storage.md) | ✅ Done |
 | 6 | [`step-6-auth.md`](step-6-auth.md) | ✅ Done |
-| 7 | — | ⏳ to be written |
+| 7 | [`step-7-quota.md`](step-7-quota.md) | 🟡 In progress |
 | 8+ | — | Pending |
