@@ -19,5 +19,6 @@ docs(step-N): mini-spec for <name>
 | # | File | Status |
 |---|------|--------|
 | 1 | *(scaffolding — no mini-spec; behavior was trivial, covered by spec §16.1)* | ✅ |
-| 2 | [`step-2-validator.md`](step-2-validator.md) | 🟡 In progress |
-| 3+ | — | Pending |
+| 2 | [`step-2-validator.md`](step-2-validator.md) | ✅ Done |
+| 3 | — | ⏳ to be written |
+| 4+ | — | Pending |

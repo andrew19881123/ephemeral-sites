@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§7.1 Validation ZIP (critica)](../SPEC.md), [§11.3 Test critici da implementare da subito](../SPEC.md), [§4.2 Flusso PUT point 4](../SPEC.md)
 **Roadmap entry**: [§16.1 step 2](../SPEC.md)
-**Status**: 🟡 Approved, in progress
+**Status**: ✅ Complete (2026-05-06, commit `f612aca`)
 **Owner**: Andrea Veronesi
 
 ---
