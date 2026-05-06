@@ -39,7 +39,7 @@ curl -X PUT "https://api.preview.your-domain.dev/api/v1/sites/my-demo" \
 
 🚧 **Work in progress — v1.0 under active development.**
 
-See [`docs/SPEC.md`](docs/SPEC.md) (coming soon) for the full technical specification and roadmap.
+See [`docs/SPEC.md`](docs/SPEC.md) for the full technical specification and roadmap, and [`CLAUDE.md`](CLAUDE.md) for contributor / AI-agent development rules (spec-driven + TDD).
 
 Current milestone: **Step 1 — scaffolding** ✅
 
