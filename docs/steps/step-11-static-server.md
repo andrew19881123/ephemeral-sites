@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§4.3 Flusso GET static](../SPEC.md), [§5.9 path speciali](../SPEC.md), [§7.2 security headers](../SPEC.md), [§11.3 test_server_serve](../SPEC.md)
 **Roadmap entry**: [§16.1 step 11](../SPEC.md)
-**Status**: ⏳ Draft
+**Status**: ✅ Complete (2026-05-06, commit `8db59de`)
 **Owner**: Andrea Veronesi
 
 ---

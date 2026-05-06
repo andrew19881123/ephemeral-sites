@@ -9,6 +9,8 @@ See ``docs/steps/step-11-static-server.md`` for the full contract.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import datetime as _dt
 import json
 import logging
@@ -19,6 +21,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
+from ephemeral_sites import auth as auth_mod
 from ephemeral_sites.config import Settings
 
 from .headers import apply_security_headers
@@ -66,6 +69,39 @@ def _safe_path(site_dir: Path, url_path: str) -> Path | None:
     return candidate
 
 
+def _verify_basic_auth(auth_header: str | None, password_hash_str: str) -> bool:
+    """Validate an ``Authorization: Basic ...`` header against the stored hash.
+
+    Returns True iff the header is well-formed, the scheme is Basic, base64
+    decodes cleanly, and the password (everything after the first ':')
+    matches the stored bcrypt hash.
+    """
+    if not auth_header:
+        return False
+    if not auth_header.lower().startswith("basic "):
+        return False
+    encoded = auth_header[6:].strip()
+    try:
+        decoded = base64.b64decode(encoded, validate=True).decode("utf-8", errors="replace")
+    except (binascii.Error, UnicodeDecodeError):
+        return False
+    if ":" not in decoded:
+        return False
+    _, password = decoded.split(":", 1)
+    stored = (
+        password_hash_str.encode("utf-8")
+        if isinstance(password_hash_str, str)
+        else password_hash_str
+    )
+    return auth_mod.verify_secret(password, stored)
+
+
+def _unauthorized_response(slug: str) -> JSONResponse:
+    response = JSONResponse({"error": "unauthorized"}, status_code=401)
+    response.headers["WWW-Authenticate"] = f'Basic realm="ephemeral-sites:{slug}", charset="UTF-8"'
+    return response
+
+
 def _response_for_file(path: Path, *, allow_indexing: bool, no_cache: bool) -> Response:
     data = path.read_bytes()
     ctype, _ = mimetypes.guess_type(path.name)
@@ -106,13 +142,13 @@ def create_server_app(
         if _site_is_expired(row):
             return JSONResponse({"error": "not_found"}, status_code=404)
 
-        # Password gate (step 12 implements verification; step 11 stub: 401).
+        # Password gate (step 12): verify Basic auth against password_hash.
         if row["password_hash"]:
-            response = JSONResponse({"error": "unauthorized"}, status_code=401)
-            response.headers["WWW-Authenticate"] = (
-                f'Basic realm="ephemeral-sites:{slug}", charset="UTF-8"'
+            auth_header = request.headers.get("authorization") or request.headers.get(
+                "Authorization"
             )
-            return response
+            if not _verify_basic_auth(auth_header, row["password_hash"]):
+                return _unauthorized_response(slug)
 
         normalized = "/" + url_path if not url_path.startswith("/") else url_path
 
