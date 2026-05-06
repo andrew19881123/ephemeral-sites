@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§6.1 Schema SQLite](../SPEC.md), [§6.3 Event log retention](../SPEC.md), [§11.3 test_db.py](../SPEC.md), [§4.2 Flusso PUT (DB transaction)](../SPEC.md)
 **Roadmap entry**: [§16.1 step 4](../SPEC.md)
-**Status**: 🟡 Approved, in progress
+**Status**: ✅ Complete (2026-05-06, commit `c407481`)
 **Owner**: Andrea Veronesi
 
 ---
