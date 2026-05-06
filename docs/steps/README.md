@@ -20,5 +20,5 @@ docs(step-N): mini-spec for <name>
 |---|------|--------|
 | 1 | *(scaffolding — no mini-spec; behavior was trivial, covered by spec §16.1)* | ✅ |
 | 2 | [`step-2-validator.md`](step-2-validator.md) | ✅ Done |
-| 3 | — | ⏳ to be written |
+| 3 | [`step-3-slug-generator.md`](step-3-slug-generator.md) | 🟡 In progress |
 | 4+ | — | Pending |
