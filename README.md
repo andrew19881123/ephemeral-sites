@@ -54,17 +54,25 @@ Current milestone: **Step 1 — scaffolding** ✅
 
 ## Development
 
+The repo ships a `Makefile` that wraps lint + tests + coverage in a single fast command (same checks CI runs):
+
 ```bash
-# Install deps
-poetry install
-
-# Run tests
-poetry run pytest
-
-# Lint & format
-poetry run ruff check .
-poetry run ruff format .
+make install        # install dev deps (poetry if available, else pip)
+make check          # lint + test + coverage (~1s on warm venv)
+make test-fast      # quick test loop while iterating
+make format         # auto-fix formatting and lint issues
 ```
+
+Run `make check` before every push — CI is the safety net, not the dev loop.
+
+Raw equivalents (if you don't have `make`):
+
+```bash
+ruff check . && ruff format --check .
+pytest -v --cov --cov-report=term-missing
+```
+
+See [`CLAUDE.md`](CLAUDE.md) for the full contributor workflow.
 
 ## License
 

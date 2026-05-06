@@ -188,16 +188,30 @@ Test fixtures (ZIP files used across many tests) live in `tests/fixtures/`:
 - **pytest** for tests, `pytest-asyncio` for async.
 - **No `mypy`** in v1 unless it pays for itself — typing hints as documentation, not enforced.
 
-Run locally:
+Run locally. The repo ships a `Makefile` that wraps the exact same commands the CI uses. Targets:
 
 ```bash
-poetry install --with dev
-poetry run pytest -v
-poetry run ruff check .
-poetry run ruff format --check .
+make install        # installs dev deps (poetry if available, else pip)
+make check          # lint + test + coverage — the full pre-push gate
+make lint           # just ruff check + format --check
+make test           # pytest with coverage report
+make test-fast      # pytest without coverage, stop on first failure
+make test-security  # only @pytest.mark.security tests
+make format         # auto-fix formatting and lint issues
+make docker-build   # build the production image
+make clean          # wipe caches
 ```
 
-CI mirrors this exactly (`.github/workflows/test.yml`).
+**Rule**: run `make check` before every `git push`. It's ~1s on a warm venv vs. ~30s for a CI round-trip. CI is the safety net, not the dev loop.
+
+Raw equivalents (if you don't have `make`):
+
+```bash
+ruff check . && ruff format --check .
+pytest -v --cov --cov-report=term-missing
+```
+
+CI (`.github/workflows/test.yml`) runs these exact commands via Poetry on Python 3.12. If `make check` is green locally on Python ≥3.11, CI will be green — the only gap is dependency resolution via `poetry.lock`, which is why `make install` prefers poetry when available.
 
 ### 5.2 Style nits
 
@@ -304,7 +318,7 @@ If you find yourself putting a non-token there (config, feature flags, ...), you
 - PRs: scope = one roadmap step, one red-green-refactor cycle per commit inside.
 - Self-review the diff before asking for review: "would I accept this from someone else?"
 
-### 7.3 CI
+### 7.3 CI and the local gate
 
 `.github/workflows/test.yml` runs:
 
@@ -313,6 +327,8 @@ If you find yourself putting a non-token there (config, feature flags, ...), you
 3. (Later steps will add) Docker build, Helm lint, Helm template validation
 
 A red CI blocks merge. No "we'll fix it in the next PR" — fix it in this one, or revert.
+
+**Before every push**, run `make check` locally (see §5.1 and the Makefile). It's the same gate in ~1s instead of ~30s. Treat CI as the safety net, not the dev loop. If `make check` is green and CI is red, something is genuinely different (usually a missing dep in `pyproject.toml` vs. the local venv) — fix the root cause, not the symptom.
 
 ---
 
@@ -364,12 +380,13 @@ New Claude session, fresh context, user says "continue ephemeral-sites"? Do this
 2. Open [`docs/SPEC.md`](docs/SPEC.md), jump to §16.1 roadmap, find the next `⏳` step.
 3. Open the master-spec sections that govern it (e.g., for step 2: §7.1 + §11.3).
 4. **Write the step mini-spec** in `docs/steps/step-N-<name>.md` (see §2.4 and [`docs/steps/_template.md`](docs/steps/_template.md)). Commit it (`docs(step-N): mini-spec for ...`) before touching tests or code.
-5. `poetry install --with dev` (idempotent).
-6. `poetry run pytest -v` — confirm green baseline.
-7. **Red** — add the failing tests listed in the mini-spec; commit; verify CI red for the right reason.
-8. **Green** — implement the minimum to pass; commit; verify CI green.
-9. **Refactor** if needed; commit; CI green.
-10. Update the roadmap table (§8 of this file) in a final `docs: mark step N complete` commit.
+5. `make install` (idempotent; uses poetry if present, else pip).
+6. `make check` — confirm green baseline locally (~1s).
+7. **Red** — add the failing tests listed in the mini-spec; run `make test-fast` and confirm the failure mode is the expected one; commit.
+8. **Green** — implement the minimum to pass; run `make check`; commit only if green.
+9. **Refactor** if needed; run `make check` after every change; commit.
+10. Push only when `make check` is green. CI is the safety net.
+11. Update the roadmap table (§8 of this file) in a final `docs: mark step N complete` commit.
 
 If `git status` is dirty, the previous session left work incomplete — read the last commit message and continue from there, do not overwrite.
 
@@ -401,7 +418,8 @@ For those use cases, users go to Netlify / Vercel / Kubero. `ephemeral-sites` do
 - [`docs/steps/`](docs/steps/) — per-step mini-specs (one file per roadmap item; write first, test second, code third)
 - [`docs/steps/_template.md`](docs/steps/_template.md) — mini-spec skeleton to copy
 - [`pyproject.toml`](pyproject.toml) — deps, pytest, ruff, coverage config
-- [`.github/workflows/test.yml`](.github/workflows/test.yml) — CI
+- [`Makefile`](Makefile) — local quality gate (`make check` before every push)
+- [`.github/workflows/test.yml`](.github/workflows/test.yml) — CI (mirror of `make check`)
 - [`README.md`](README.md) — user-facing quickstart
 - `.secret/` (gitignored, not in repo tree) — local tokens, see §6bis
 - Upstream docs: [FastAPI](https://fastapi.tiangolo.com/), [cert-manager](https://cert-manager.io/docs/), [Traefik](https://doc.traefik.io/traefik/)
