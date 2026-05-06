@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§3.3 "Quota globale storage"](../SPEC.md), [§4.2 Flusso PUT punto 3](../SPEC.md), [§5.2 HTTP 507](../SPEC.md), [§9 maxTotalStorageBytes default 40 GiB](../SPEC.md), [§11.3 test_quota](../SPEC.md)
 **Roadmap entry**: [§16.1 step 7](../SPEC.md)
-**Status**: 🟡 Approved, in progress
+**Status**: ✅ Complete (2026-05-06, commit `d998ba5`)
 **Owner**: Andrea Veronesi
 
 ---

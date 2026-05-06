@@ -344,8 +344,8 @@ The 18-step sequence is in [`docs/SPEC.md` §16.1](docs/SPEC.md). Current status
 | 4 | DB + migrations (27 tests, 92% cov) | ✅ Done — `133be00` (mini-spec), `58c4fef` (red), `c407481` (feat) |
 | 5 | Storage atomic swap (22 tests, 81% cov, renameat2 zero-404) | ✅ Done — `cf9914d` (mini-spec), `ac12be5` (red), `2900c25` (feat) |
 | 6 | Auth (35 tests, 95% cov) | ✅ Done — `2b16a2f` (mini-spec), `1317ed4` (red), `ffe4c6c` (feat) |
-| 7 | Quota check | ⏳ Next |
-| 8 | API PUT upsert | Pending |
+| 7 | Quota check (16 tests, 92% cov) | ✅ Done — `70c4a63` (mini-spec), `a1c6701` (red), `d998ba5` (feat) |
+| 8 | API PUT upsert | ⏳ Next |
 | 9 | API CRUD (GET/DELETE/PATCH/POST/LIST) | Pending |
 | 10 | Runtime config injection | Pending |
 | 11 | Static server + SPA fallback + security headers | Pending |
