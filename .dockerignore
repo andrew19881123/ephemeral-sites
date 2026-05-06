@@ -1,0 +1,44 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Tests (not needed in runtime image)
+tests/
+
+# Docs / examples (not needed in runtime image)
+docs/
+*.md
+charts/
+cli/
+docker-compose.yml
+docker-compose.yaml
+
+# IDE
+.idea/
+.vscode/
+
+# Local secrets
+.env
+.env.*
+.secret/
+
+# Local data
+data/
+logs/
+*.db*
