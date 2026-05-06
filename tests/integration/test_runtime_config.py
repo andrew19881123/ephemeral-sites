@@ -33,9 +33,7 @@ def test_db_runtime_config_matches_disk(
 
     conn = open_conn()
     try:
-        row = conn.execute(
-            "SELECT runtime_config FROM sites WHERE slug='demo'"
-        ).fetchone()
+        row = conn.execute("SELECT runtime_config FROM sites WHERE slug='demo'").fetchone()
         assert row is not None
         stored = row[0]
         assert json.loads(stored) == json.loads(cfg)

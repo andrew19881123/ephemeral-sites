@@ -6,7 +6,6 @@ import datetime as _dt
 import io
 import json as _json
 import zipfile
-from pathlib import Path
 
 import pytest
 
@@ -49,17 +48,13 @@ def server_client(settings, api_client, auth_headers, spa_zip_with_static):
 
 
 def test_spa_fallback_to_index_html(server_client):
-    r = server_client.get(
-        "/any/nonexistent/route", headers={"Host": "demo.preview.test"}
-    )
+    r = server_client.get("/any/nonexistent/route", headers={"Host": "demo.preview.test"})
     assert r.status_code == 200
     assert b"demo" in r.content or b"<!doctype" in r.content.lower()
 
 
 def test_static_asset_not_fallback(server_client):
-    r = server_client.get(
-        "/static/nonexistent.js", headers={"Host": "demo.preview.test"}
-    )
+    r = server_client.get("/static/nonexistent.js", headers={"Host": "demo.preview.test"})
     assert r.status_code == 404
 
 
@@ -103,10 +98,15 @@ def test_missing_slug_returns_404(server_client):
 
 
 def test_path_traversal_rejected(server_client):
+    """httpx normalises '..' segments client-side (RFC 3986). Whatever reaches
+    the handler, the body MUST NOT be /etc/passwd content."""
     r = server_client.get("/../../etc/passwd", headers={"Host": "demo.preview.test"})
-    # httpx normalises '..' segments client-side; ensure we either 404 or 400,
-    # but never leak /etc/passwd content.
-    assert r.status_code in (400, 404)
+    body = r.content.lower()
+    assert b"root:" not in body
+    assert b"/bin/bash" not in body
+    # Directly request with '..' preserved via a url that bypasses normalization.
+    r2 = server_client.get("/%2e%2e/%2e%2e/etc/passwd", headers={"Host": "demo.preview.test"})
+    assert r2.status_code in (400, 404)
 
 
 def test_ephemeral_info_endpoint(server_client):
@@ -148,9 +148,7 @@ def test_config_json_present(api_client, auth_headers, settings, spa_zip_with_st
     assert r.headers.get("Cache-Control") == "no-cache"
 
 
-def test_expired_site_returns_404(
-    api_client, auth_headers, spa_zip_with_static, settings
-):
+def test_expired_site_returns_404(api_client, auth_headers, spa_zip_with_static, settings):
     """Set expires_at in the past via DB, then query."""
     from fastapi.testclient import TestClient
 
@@ -163,12 +161,8 @@ def test_expired_site_returns_404(
         files={"file": ("spa.zip", spa_zip_with_static, "application/zip")},
     )
     conn = api_deps._DB_CACHE[settings.db_path]
-    past = (_dt.datetime.now(_dt.UTC) - _dt.timedelta(hours=1)).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
-    conn.execute(
-        "UPDATE sites SET expires_at = ? WHERE slug = 'stale'", (past,)
-    )
+    past = (_dt.datetime.now(_dt.UTC) - _dt.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn.execute("UPDATE sites SET expires_at = ? WHERE slug = 'stale'", (past,))
 
     srv = server_app_module.create_server_app(settings=settings, db_conn=conn)
     client = TestClient(srv)
@@ -176,9 +170,7 @@ def test_expired_site_returns_404(
     assert r.status_code == 404
 
 
-def test_password_protected_returns_401(
-    api_client, auth_headers, spa_zip_with_static, settings
-):
+def test_password_protected_returns_401(api_client, auth_headers, spa_zip_with_static, settings):
     """Password-protected site returns 401 with WWW-Authenticate (step 12 refines)."""
     from fastapi.testclient import TestClient
 
@@ -199,9 +191,7 @@ def test_password_protected_returns_401(
     assert "Basic" in r.headers.get("WWW-Authenticate", "")
 
 
-def test_allow_indexing_omits_robots(
-    api_client, auth_headers, spa_zip_with_static, settings
-):
+def test_allow_indexing_omits_robots(api_client, auth_headers, spa_zip_with_static, settings):
     from fastapi.testclient import TestClient
 
     from ephemeral_sites.api import deps as api_deps

@@ -167,12 +167,8 @@ async def put_site(
         existing_rc_row = conn.execute(
             "SELECT runtime_config FROM sites WHERE slug = ?", (slug,)
         ).fetchone()
-        preserved_rc_raw: str | None = (
-            existing_rc_row[0] if existing_rc_row is not None else None
-        )
-        parsed_runtime_config = (
-            json.loads(preserved_rc_raw) if preserved_rc_raw else None
-        )
+        preserved_rc_raw: str | None = existing_rc_row[0] if existing_rc_row is not None else None
+        parsed_runtime_config = json.loads(preserved_rc_raw) if preserved_rc_raw else None
     else:
         parsed_runtime_config = _parse_json_field(runtime_config, "runtime_config")
     parsed_labels = _parse_json_field(labels, "labels")

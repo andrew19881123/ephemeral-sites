@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§5.2 field `runtime_config`](../SPEC.md), [§5.9 `/config.json`](../SPEC.md), [§6.1 `sites.runtime_config` column](../SPEC.md), [§11.3 test_runtime_config](../SPEC.md)
 **Roadmap entry**: [§16.1 step 10](../SPEC.md)
-**Status**: ⏳ Draft
+**Status**: ✅ Complete (2026-05-06, commit `0a022d6`)
 **Owner**: Andrea Veronesi
 
 ---
