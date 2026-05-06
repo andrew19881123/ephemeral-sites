@@ -17,7 +17,6 @@ import pytest
 
 from ephemeral_sites import db
 
-
 # ---------------------------------------------------------------------------
 # §4.1 open_db basics
 # ---------------------------------------------------------------------------
@@ -87,9 +86,7 @@ def test_open_db_twice_is_idempotent(tmp_path: Path):
     try:
         tables = {
             row[0]
-            for row in c2.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for row in c2.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
         assert {"sites", "api_keys", "event_log"} <= tables
     finally:
@@ -114,9 +111,7 @@ def test_open_db_readonly_does_not_run_migrations(tmp_path: Path):
         assert version == 0
         tables = {
             row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
         assert "sites" not in tables
     finally:
@@ -233,8 +228,7 @@ def test_schema_creates_expected_indexes(tmp_path: Path):
         idxs = {
             row[0]
             for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='index' "
-                "AND name NOT LIKE 'sqlite_%'"
+                "SELECT name FROM sqlite_master WHERE type='index' " "AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
         expected = {
@@ -252,8 +246,7 @@ def test_idx_sites_expires_is_partial(tmp_path: Path):
     conn = db.open_db(tmp_path / "a.db")
     try:
         sql = conn.execute(
-            "SELECT sql FROM sqlite_master "
-            "WHERE type='index' AND name='idx_sites_expires'"
+            "SELECT sql FROM sqlite_master " "WHERE type='index' AND name='idx_sites_expires'"
         ).fetchone()[0]
         # Partial index must contain a WHERE clause against expires_at.
         assert "WHERE" in sql.upper()
@@ -296,9 +289,7 @@ def test_migration_v0_to_v1(tmp_path: Path):
         assert db.get_schema_version(conn) == 1
         tables = {
             r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
         assert {"sites", "api_keys", "event_log"} <= tables
     finally:
@@ -339,9 +330,9 @@ def test_run_migrations_creates_backup_before_applying(tmp_path: Path):
         conn.close()
 
     backups = list(backup_dir.iterdir())
-    assert any(p.name.startswith("ephemeral-sites.db.backup-v0") for p in backups), (
-        f"expected backup file starting with backup-v0, got {[p.name for p in backups]}"
-    )
+    assert any(
+        p.name.startswith("ephemeral-sites.db.backup-v0") for p in backups
+    ), f"expected backup file starting with backup-v0, got {[p.name for p in backups]}"
 
 
 def test_run_migrations_skips_backup_when_backup_dir_none(tmp_path: Path):
@@ -358,7 +349,7 @@ def test_run_migrations_skips_backup_when_backup_dir_none(tmp_path: Path):
     finally:
         conn.close()
     # No file named backup-v* should exist anywhere in tmp_path.
-    backups = [p for p in tmp_path.rglob("*backup-v*")]
+    backups = list(tmp_path.rglob("*backup-v*"))
     assert backups == []
 
 
@@ -380,9 +371,7 @@ def test_run_migrations_rolls_back_on_failure(tmp_path: Path):
         # The "pre" table must NOT exist (rollback).
         tables = {
             r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
         assert "pre" not in tables
     finally:
@@ -391,9 +380,9 @@ def test_run_migrations_rolls_back_on_failure(tmp_path: Path):
 
 def test_migrations_registry_is_strictly_linear():
     versions = [m.target_version for m in db.MIGRATIONS]
-    assert versions == list(range(1, len(versions) + 1)), (
-        f"MIGRATIONS versions not strictly linear: {versions}"
-    )
+    assert versions == list(
+        range(1, len(versions) + 1)
+    ), f"MIGRATIONS versions not strictly linear: {versions}"
 
 
 # ---------------------------------------------------------------------------
