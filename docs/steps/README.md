@@ -1,0 +1,23 @@
+# Step mini-specs
+
+One file per roadmap step (see [`../SPEC.md` §16.1](../SPEC.md) for the master list). Each file is written **before** the corresponding test and code — see [`../../CLAUDE.md` §2.4](../../CLAUDE.md) for the rule and rationale.
+
+## Naming
+
+`step-N-<short-kebab-name>.md` — e.g. `step-2-validator.md`, `step-8-api-put-upsert.md`.
+
+## Template
+
+Copy [`_template.md`](_template.md), rename, fill every section, commit as:
+
+```
+docs(step-N): mini-spec for <name>
+```
+
+## Index (updated after each step)
+
+| # | File | Status |
+|---|------|--------|
+| 1 | *(scaffolding — no mini-spec; behavior was trivial, covered by spec §16.1)* | ✅ |
+| 2 | — | ⏳ to be written |
+| 3+ | — | Pending |

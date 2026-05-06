@@ -4,10 +4,18 @@ This file is the entry point for any AI agent (Claude Code or equivalent) workin
 
 > **Two rules, in this order:**
 >
-> 1. **Spec-driven.** The [`docs/SPEC.md`](docs/SPEC.md) is the single source of truth. Never invent features or deviate from it silently. If reality forces a deviation, amend the spec first, then the code.
+> 1. **Spec-driven.** The [`docs/SPEC.md`](docs/SPEC.md) is the single source of truth. Never invent features or deviate from it silently. If reality forces a deviation, amend the spec first, then the code. **Every step must also have its own written mini-spec in `docs/steps/step-N-<name>.md` before any test or code is written** — see §2.4.
 > 2. **TDD, always.** Red → Green → Refactor for every behavior change. A test that does not yet fail is not a test — it is a decoration.
 
 Violating either rule is considered a defect, even if the code compiles and the feature "works."
+
+**Document triad**: for every behavior that lands in `main` you must be able to point to three artefacts:
+
+- **What** — the step mini-spec (`docs/steps/step-N-*.md`) or a spec amendment (`docs/SPEC.md`).
+- **How it's verified** — the tests (`tests/unit/...`, `tests/integration/...`).
+- **The implementation** — the code (`src/ephemeral_sites/...`).
+
+If one of the three is missing, the change is incomplete.
 
 ---
 
@@ -46,6 +54,40 @@ The spec file in-repo is versioned exactly like code. Reviewers review both.
 ### 2.3 Placeholders that must NOT leak into code
 
 The spec's §13 "Open Points" lists four placeholders still unresolved: domain name, GCP static IP, owner email for Let's Encrypt, GitHub org. Keep them as Helm values (already templated in `values.yaml`) or env vars — **never hard-coded** in Python, Dockerfile, or chart templates.
+
+### 2.4 Step mini-specs (write the spec before the test)
+
+The master spec (`docs/SPEC.md`) describes **what the system does**. It intentionally does not dictate the *exact shape* of each step's public surface — function signatures, exception types, exact rejection reasons, fixture structure. That is the job of the **step mini-spec**.
+
+**Rule**: before writing a single test or line of code for roadmap step N, you must write `docs/steps/step-N-<short-name>.md` (template below) and commit it. The mini-spec answers these questions:
+
+- **Goal**: what this step delivers, in one paragraph, referencing the relevant master-spec sections.
+- **Public API / contract**: function signatures, classes, HTTP endpoints, exception types, return shapes. Concrete enough that two developers would produce API-compatible implementations from it.
+- **Acceptance criteria**: a numbered list of observable behaviors. Each item maps 1:1 to at least one test.
+- **Test list**: the tests you commit to writing, by name and file path. This is the red-list for the TDD cycle.
+- **Edge cases & out-of-scope**: what must be handled, what is deferred to a later step or to v1.1 — cite the master-spec section that justifies it.
+- **Open questions**: anything unclear in the master spec that must be resolved before coding. If non-empty, the mini-spec is not approved yet; do not start coding. Resolve them, either by reading the spec more carefully or by asking the spec owner.
+
+A template lives at [`docs/steps/_template.md`](docs/steps/_template.md) — copy it, rename, fill in, commit.
+
+**Commit sequence for a step**:
+
+```
+docs(step-N): mini-spec for <feature>              # the what
+test(step-N): add red tests for <feature>          # the how (verified)
+feat(step-N): implement <feature>                  # the code (green)
+refactor(step-N): <optional>                       # cleanup (still green)
+docs(step-N): mark complete in CLAUDE.md §8        # update roadmap status
+```
+
+The first commit (`docs(step-N): mini-spec`) is mandatory. The whole point is that **the step is documented before it's built** — so the documentation never lags the code. If you discover mid-implementation that the mini-spec was wrong, stop, amend the mini-spec, commit the amendment, then continue.
+
+### 2.5 Master-spec vs. mini-spec — when to put what where
+
+- **Master spec (`docs/SPEC.md`)** holds user-visible contracts: the HTTP API, security invariants, Helm values, architecture decisions. Changes to it are a versioned product decision — commit them separately, discuss if non-trivial.
+- **Step mini-spec (`docs/steps/step-N-*.md`)** holds implementation-level contracts: module boundaries, error taxonomy, test list. Changes are part of the normal implementation flow.
+
+When in doubt: if the change would affect a user of the HTTP API or someone deploying via Helm, it goes in the master spec. Otherwise it goes in the step spec.
 
 ---
 
@@ -190,6 +232,61 @@ The spec §7 is not optional reading. Key invariants that MUST be reflected in t
 
 ---
 
+## 6bis. Secrets handling (local, never committed)
+
+Local secrets that don't belong in `.env` or in Kubernetes Secrets — personal tokens the owner uses from the dev machine — live in the **gitignored** `.secret/` directory at the repo root.
+
+### 6bis.1 Current contents
+
+| File | Contents | Scope |
+|------|----------|-------|
+| `.secret/github_token.env` | `GH_TOKEN` / `GITHUB_TOKEN` — GitHub Personal Access Token for `andrew19881123/ephemeral-sites` (push, PR, Actions read) | Used by `gh` CLI, `git push`, CI debugging from the dev machine |
+
+### 6bis.2 Rules
+
+- The directory is protected by a matching line in `.gitignore` (`.secret/`). **Never remove that line.** Verify before any commit: `git check-ignore -v .secret/github_token.env`.
+- Permissions: `chmod 700 .secret` (dir), `chmod 600` (files). If you clone fresh, re-apply them.
+- **Never** print, echo, `cat`, paste, or otherwise emit the token contents — not in commits, not in log lines, not in chat replies, not in commit messages, not in CI output.
+- **Never** store secrets in `bot_settings.json`, `pyproject.toml`, Dockerfile, Helm values, or any tracked file.
+- If a token is exposed by accident (leaked log, pushed file, shared in chat): **rotate immediately** at <https://github.com/settings/tokens>, replace the file, then grep history (`git log --all -S 'github_pat_'`) to confirm no trace remains.
+
+### 6bis.3 Usage patterns
+
+Preferred — inline, no env pollution of child processes you don't control:
+
+```bash
+GH_TOKEN=$(grep ^GH_TOKEN .secret/github_token.env | cut -d= -f2) \
+  gh run list --repo andrew19881123/ephemeral-sites
+```
+
+Acceptable — source into current shell when you will run many commands in a row:
+
+```bash
+source .secret/github_token.env
+gh run list --repo andrew19881123/ephemeral-sites
+gh pr list  --repo andrew19881123/ephemeral-sites
+# ... remember the token is still in env until `unset GH_TOKEN GITHUB_TOKEN`
+```
+
+For `git push` against a private repo, prefer a remote URL that does NOT embed the token; let `gh` or a credential helper supply it:
+
+```bash
+gh auth setup-git      # once, uses GH_TOKEN from env
+git push origin main   # credentials resolved via helper
+```
+
+Embedding the token directly in the remote URL (`https://oauth2:$TOKEN@github.com/...`) works but risks leaking into shell history and `.git/config`. If you must use it, pass the URL explicitly on the command line (does not persist), never via `git remote set-url`.
+
+### 6bis.4 What `.secret/` is NOT for
+
+- Kubernetes Secrets → those are generated at deploy time (`kubectl create secret ...`, see spec §12.2).
+- CI secrets → use GitHub Actions `secrets.*` context.
+- Application runtime config → use env vars sourced from `.env` (also gitignored; see `.env.example` once it exists) or a mounted Secret.
+
+If you find yourself putting a non-token there (config, feature flags, ...), you're using the wrong channel.
+
+---
+
 ## 7. Git workflow
 
 ### 7.1 Commits
@@ -265,13 +362,18 @@ New Claude session, fresh context, user says "continue ephemeral-sites"? Do this
 
 1. Read this file (done — you're here).
 2. Open [`docs/SPEC.md`](docs/SPEC.md), jump to §16.1 roadmap, find the next `⏳` step.
-3. Open the spec sections that govern it (e.g., for step 2: §7.1 + §11.3).
-4. `poetry install --with dev` (idempotent).
-5. `poetry run pytest -v` — confirm green baseline.
-6. Start the red-green-refactor cycle for the first sub-behavior of the step.
-7. Commit (see §7.1), push, watch CI.
+3. Open the master-spec sections that govern it (e.g., for step 2: §7.1 + §11.3).
+4. **Write the step mini-spec** in `docs/steps/step-N-<name>.md` (see §2.4 and [`docs/steps/_template.md`](docs/steps/_template.md)). Commit it (`docs(step-N): mini-spec for ...`) before touching tests or code.
+5. `poetry install --with dev` (idempotent).
+6. `poetry run pytest -v` — confirm green baseline.
+7. **Red** — add the failing tests listed in the mini-spec; commit; verify CI red for the right reason.
+8. **Green** — implement the minimum to pass; commit; verify CI green.
+9. **Refactor** if needed; commit; CI green.
+10. Update the roadmap table (§8 of this file) in a final `docs: mark step N complete` commit.
 
 If `git status` is dirty, the previous session left work incomplete — read the last commit message and continue from there, do not overwrite.
+
+**Need repo credentials?** See §6bis. The `.secret/` directory has the PAT if you need to push to `main`, query CI via `gh`, or debug Actions. Never echo, never commit.
 
 ---
 
@@ -295,8 +397,11 @@ For those use cases, users go to Netlify / Vercel / Kubero. `ephemeral-sites` do
 
 ## 11. References
 
-- [`docs/SPEC.md`](docs/SPEC.md) — the spec, the law
+- [`docs/SPEC.md`](docs/SPEC.md) — the master spec, the law
+- [`docs/steps/`](docs/steps/) — per-step mini-specs (one file per roadmap item; write first, test second, code third)
+- [`docs/steps/_template.md`](docs/steps/_template.md) — mini-spec skeleton to copy
 - [`pyproject.toml`](pyproject.toml) — deps, pytest, ruff, coverage config
 - [`.github/workflows/test.yml`](.github/workflows/test.yml) — CI
 - [`README.md`](README.md) — user-facing quickstart
+- `.secret/` (gitignored, not in repo tree) — local tokens, see §6bis
 - Upstream docs: [FastAPI](https://fastapi.tiangolo.com/), [cert-manager](https://cert-manager.io/docs/), [Traefik](https://doc.traefik.io/traefik/)
