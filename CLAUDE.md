@@ -342,8 +342,8 @@ The 18-step sequence is in [`docs/SPEC.md` §16.1](docs/SPEC.md). Current status
 | 2 | ZIP validator (30 tests, 95% cov) | ✅ Done — `d6cddae` (mini-spec), `b1df6a2` (red), `f612aca` (feat) |
 | 3 | Slug generator (32 tests, 100% cov) | ✅ Done — `2cb5c21` (mini-spec), `df55898` (red), `d0a3026` (feat) |
 | 4 | DB + migrations (27 tests, 92% cov) | ✅ Done — `133be00` (mini-spec), `58c4fef` (red), `c407481` (feat) |
-| 5 | Storage atomic swap | ⏳ Next |
-| 6 | Auth (bcrypt, API key, delete token) | Pending |
+| 5 | Storage atomic swap (22 tests, 81% cov, renameat2 zero-404) | ✅ Done — `cf9914d` (mini-spec), `ac12be5` (red), `2900c25` (feat) |
+| 6 | Auth (bcrypt, API key, delete token) | ⏳ Next |
 | 7 | Quota check | Pending |
 | 8 | API PUT upsert | Pending |
 | 9 | API CRUD (GET/DELETE/PATCH/POST/LIST) | Pending |

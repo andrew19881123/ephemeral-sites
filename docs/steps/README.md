@@ -22,5 +22,6 @@ docs(step-N): mini-spec for <name>
 | 2 | [`step-2-validator.md`](step-2-validator.md) | ✅ Done |
 | 3 | [`step-3-slug-generator.md`](step-3-slug-generator.md) | ✅ Done |
 | 4 | [`step-4-db-migrations.md`](step-4-db-migrations.md) | ✅ Done |
-| 5 | [`step-5-storage.md`](step-5-storage.md) | 🟡 In progress |
-| 6+ | — | Pending |
+| 5 | [`step-5-storage.md`](step-5-storage.md) | ✅ Done |
+| 6 | — | ⏳ to be written |
+| 7+ | — | Pending |

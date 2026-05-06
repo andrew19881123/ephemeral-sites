@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§4.2 Flusso PUT extraction + swap](../SPEC.md), [§5.5 DELETE semantics](../SPEC.md), [§6.2 Filesystem layout](../SPEC.md), [§11.3 test_storage_atomic](../SPEC.md)
 **Roadmap entry**: [§16.1 step 5](../SPEC.md)
-**Status**: 🟡 Approved, in progress
+**Status**: ✅ Complete (2026-05-06, commit `2900c25`)
 **Owner**: Andrea Veronesi
 
 ---
