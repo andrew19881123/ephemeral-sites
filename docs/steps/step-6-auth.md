@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§5.1 Autenticazione](../SPEC.md), [§5.5 DELETE auth alternatives](../SPEC.md), [§6.1 api_keys table](../SPEC.md), [§7.5 rotation](../SPEC.md), [§7.6 secrets handling](../SPEC.md), [§11.3 test_auth](../SPEC.md)
 **Roadmap entry**: [§16.1 step 6](../SPEC.md)
-**Status**: 🟡 Approved, in progress
+**Status**: ✅ Complete (2026-05-06, commit `ffe4c6c`)
 **Owner**: Andrea Veronesi
 
 ---
