@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§4.2 Flusso PUT](../SPEC.md), [§5.1 Auth](../SPEC.md), [§5.2 Endpoint PUT](../SPEC.md), [§6.1 schema `sites` + `event_log`](../SPEC.md), [§9 Helm values (limits)](../SPEC.md), [§11.3 test_api_upsert.py (3 tests)](../SPEC.md)
 **Roadmap entry**: [§16.1 step 8](../SPEC.md)
-**Status**: ⏳ Draft
+**Status**: ✅ Complete (2026-05-06, commit `2f9a962`)
 **Owner**: Andrea Veronesi
 
 ---
