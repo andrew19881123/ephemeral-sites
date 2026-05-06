@@ -159,7 +159,22 @@ async def put_site(
     effective_ttl = settings.default_ttl_seconds if ttl_seconds is None else ttl_seconds
     _validate_ttl(effective_ttl, settings)
 
-    parsed_runtime_config = _parse_json_field(runtime_config, "runtime_config")
+    # runtime_config semantics (step 10):
+    # - field absent or empty string → preserve existing DB value (carry-forward).
+    # - field present with valid JSON → overwrite.
+    # - field present with malformed JSON → 400 via _parse_json_field.
+    if runtime_config is None or runtime_config == "":
+        existing_rc_row = conn.execute(
+            "SELECT runtime_config FROM sites WHERE slug = ?", (slug,)
+        ).fetchone()
+        preserved_rc_raw: str | None = (
+            existing_rc_row[0] if existing_rc_row is not None else None
+        )
+        parsed_runtime_config = (
+            json.loads(preserved_rc_raw) if preserved_rc_raw else None
+        )
+    else:
+        parsed_runtime_config = _parse_json_field(runtime_config, "runtime_config")
     parsed_labels = _parse_json_field(labels, "labels")
     if password == "":
         raise InvalidTtl("password, if present, must be non-empty")  # reuse 400 slug
