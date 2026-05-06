@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§5.3 POST](../SPEC.md), [§5.4 GET {slug}](../SPEC.md), [§5.5 DELETE](../SPEC.md), [§5.6 PATCH](../SPEC.md), [§5.7 LIST](../SPEC.md), [§11.3 test_api_lifecycle](../SPEC.md)
 **Roadmap entry**: [§16.1 step 9](../SPEC.md)
-**Status**: ⏳ Draft
+**Status**: ✅ Complete (2026-05-06, commit `b2b7b99`)
 **Owner**: Andrea Veronesi
 
 ---
