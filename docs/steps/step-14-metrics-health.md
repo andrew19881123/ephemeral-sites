@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§5.8 probes & metrics](../SPEC.md)
 **Roadmap entry**: [§16.1 step 14](../SPEC.md)
-**Status**: ⏳ Draft
+**Status**: ✅ Complete (2026-05-07, commit `304a6b1`)
 
 ---
 

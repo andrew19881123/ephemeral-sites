@@ -1,0 +1,31 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ephemeral-sites.fullname" . }}-api
+  labels:
+    {{- include "ephemeral-sites.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.apiHost | quote }}
+      secretName: {{ if eq .Values.ingress.tls.mode "existing-secret" }}{{ .Values.ingress.tls.existingSecret }}{{ else }}{{ include "ephemeral-sites.fullname" . }}-api-tls{{ end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.apiHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ephemeral-sites.fullname" . }}-api
+                port:
+                  number: 8000
+{{- end }}

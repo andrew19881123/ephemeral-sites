@@ -1,0 +1,104 @@
+# ===================================================
+# ephemeral-sites — values.yaml
+# ===================================================
+# See docs/SPEC.md section 9 for the reference.
+
+# ---- Domain & Ingress ----
+domain: preview.example.test          # REPLACE at deploy time
+wildcardHost: "*.preview.example.test" # REPLACE at deploy time
+apiHost: api.preview.example.test      # REPLACE at deploy time
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  tls:
+    enabled: true
+    mode: cert-manager # cert-manager | existing-secret | disabled
+    certManager:
+      clusterIssuer: letsencrypt-prod
+    existingSecret: ""
+
+dns:
+  provider: cloudflare
+  zone: example.test                   # REPLACE
+
+# ---- Storage ----
+storage:
+  storageClass: local-path
+  size: 50Gi
+  accessMode: ReadWriteOnce
+
+# ---- Limits ----
+limits:
+  maxZipSize: 524288000              # 500 MiB (bytes, for env var)
+  maxFilesPerSite: 5000
+  defaultTtlSeconds: 86400           # 1 day
+  maxTtlSeconds: 31536000            # 1 year
+  allowPermanent: true
+  ratePerMinute: 60
+  maxTotalStorageBytes: 42949672960  # 40 GiB
+  maxDecompressionRatio: 100
+
+siteDefaults:
+  allowIndexing: false
+  spaMode: true
+
+# ---- Cleanup CronJob ----
+cleanup:
+  schedule: "*/5 * * * *"
+  eventLogRetentionDays: 90
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 20m
+      memory: 32Mi
+
+# ---- App ----
+app:
+  replicas: 1
+  image:
+    repository: ghcr.io/andrew19881123/ephemeral-sites
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  baseDomain: preview.example.test   # REPLACE — usually == domain
+
+# ---- Auth ----
+auth:
+  existingSecret: ephemeral-sites-auth  # must exist; key API_KEYS
+
+# ---- Observability ----
+logging:
+  level: INFO
+  format: json
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}
+
+# ---- Probes ----
+probes:
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3

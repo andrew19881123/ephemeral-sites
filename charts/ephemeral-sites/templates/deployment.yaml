@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ephemeral-sites.fullname" . }}
+  labels:
+    {{- include "ephemeral-sites.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.app.replicas }}
+  strategy:
+    type: Recreate # RWO PVC forbids parallel pods
+  selector:
+    matchLabels:
+      {{- include "ephemeral-sites.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ephemeral-sites.selectorLabels" . | nindent 8 }}
+      {{- with .Values.app.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          command: ["uvicorn", "ephemeral_sites.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - name: http-api
+              containerPort: 8000
+          env:
+            - name: EPHEMERAL_DB_PATH
+              value: /data/db/ephemeral-sites.db
+            - name: EPHEMERAL_SITES_ROOT
+              value: /data/sites
+            - name: EPHEMERAL_LOCK_DIR
+              value: /data/sites/.lock
+            - name: EPHEMERAL_BASE_DOMAIN
+              value: {{ .Values.app.baseDomain | quote }}
+            - name: EPHEMERAL_MAX_ZIP_SIZE
+              value: {{ .Values.limits.maxZipSize | quote }}
+            - name: EPHEMERAL_MAX_FILES_PER_SITE
+              value: {{ .Values.limits.maxFilesPerSite | quote }}
+            - name: EPHEMERAL_MAX_TOTAL_STORAGE_BYTES
+              value: {{ .Values.limits.maxTotalStorageBytes | quote }}
+            - name: EPHEMERAL_MAX_DECOMPRESSION_RATIO
+              value: {{ .Values.limits.maxDecompressionRatio | quote }}
+            - name: EPHEMERAL_DEFAULT_TTL_SECONDS
+              value: {{ .Values.limits.defaultTtlSeconds | quote }}
+            - name: EPHEMERAL_MAX_TTL_SECONDS
+              value: {{ .Values.limits.maxTtlSeconds | quote }}
+            - name: EPHEMERAL_ALLOW_PERMANENT
+              value: {{ .Values.limits.allowPermanent | quote }}
+            - name: EPHEMERAL_API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret }}
+                  key: API_KEYS
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http-api
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http-api
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+        - name: static
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          command: ["uvicorn", "ephemeral_sites.server.app:create_server_app", "--factory", "--host", "0.0.0.0", "--port", "8001"]
+          ports:
+            - name: http-static
+              containerPort: 8001
+          env:
+            - name: EPHEMERAL_DB_PATH
+              value: /data/db/ephemeral-sites.db
+            - name: EPHEMERAL_SITES_ROOT
+              value: /data/sites
+            - name: EPHEMERAL_BASE_DOMAIN
+              value: {{ .Values.app.baseDomain | quote }}
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "ephemeral-sites.fullname" . }}-data
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.app.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ephemeral-sites.fullname" . }}-cleanup
+  labels:
+    {{- include "ephemeral-sites.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cleanup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{- include "ephemeral-sites.selectorLabels" . | nindent 12 }}
+            component: cleanup
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+          containers:
+            - name: cleanup
+              image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+              imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+              command: ["python", "-m", "ephemeral_sites.cleanup"]
+              env:
+                - name: EPHEMERAL_DB_PATH
+                  value: /data/db/ephemeral-sites.db
+                - name: EPHEMERAL_SITES_ROOT
+                  value: /data/sites
+                - name: EPHEMERAL_LOCK_DIR
+                  value: /data/sites/.lock
+              resources:
+                {{- toYaml .Values.cleanup.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "ephemeral-sites.fullname" . }}-data

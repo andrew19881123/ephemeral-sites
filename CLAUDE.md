@@ -351,8 +351,8 @@ The 18-step sequence is in [`docs/SPEC.md` §16.1](docs/SPEC.md). Current status
 | 11 | Static server + SPA fallback + security headers (26 tests, 91.5% cov) | ✅ Done — `8db59de` |
 | 12 | Password protection (9 tests, HTTP Basic against bcrypt hash) | ✅ Done — `a649c3e` |
 | 13 | Cleanup CronJob (7 tests, Monday event_log purge) | ✅ Done — `acaa52b` |
-| 14 | Metrics + health endpoints | ⏳ Next |
-| 15 | Helm chart | Pending |
+| 14 | Metrics + health endpoints (10 tests, Prometheus + healthz/readyz) | ✅ Done — `304a6b1` |
+| 15 | Helm chart | ⏳ Next |
 | 16 | CLI bash helpers | Pending |
 | 17 | README + docs | Pending |
 | 18 | E2E on k3d | Pending |
