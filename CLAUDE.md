@@ -350,8 +350,8 @@ The 18-step sequence is in [`docs/SPEC.md` §16.1](docs/SPEC.md). Current status
 | 10 | Runtime config injection (5 tests, carry-forward on replace) | ✅ Done — `0a022d6` (mini-spec+red+feat) |
 | 11 | Static server + SPA fallback + security headers (26 tests, 91.5% cov) | ✅ Done — `8db59de` |
 | 12 | Password protection (9 tests, HTTP Basic against bcrypt hash) | ✅ Done — `a649c3e` |
-| 13 | Cleanup CronJob | ⏳ Next |
-| 14 | Metrics + health endpoints | Pending |
+| 13 | Cleanup CronJob (7 tests, Monday event_log purge) | ✅ Done — `acaa52b` |
+| 14 | Metrics + health endpoints | ⏳ Next |
 | 15 | Helm chart | Pending |
 | 16 | CLI bash helpers | Pending |
 | 17 | README + docs | Pending |

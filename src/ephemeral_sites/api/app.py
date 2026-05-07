@@ -14,6 +14,7 @@ from ephemeral_sites.config import Settings
 from .deps import get_settings_dep
 from .errors import register_exception_handlers
 from .middleware import RequestIdMiddleware
+from .routes_probes import router as probes_router
 from .routes_sites import router as sites_router
 
 __all__ = ["create_app"]
@@ -37,6 +38,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
 
     # Routes.
     app.include_router(sites_router)
+    app.include_router(probes_router)
 
     # Dependency override for tests.
     if settings is not None:

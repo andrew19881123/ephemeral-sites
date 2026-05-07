@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from fastapi import Path as PathParam
 
 from ephemeral_sites import auth, quota, storage, validator
+from ephemeral_sites import metrics as mx
 from ephemeral_sites import slug as slug_module
 from ephemeral_sites.config import Settings
 
@@ -291,6 +292,12 @@ async def put_site(
             )
             raise
 
+        # Metrics (step 14)
+        if is_create:
+            mx.created_total.labels(api_key_name=api_key.name).inc()
+        else:
+            mx.replaced_total.labels(api_key_name=api_key.name).inc()
+
         return SiteResponse(
             slug=slug,
             url=f"https://{slug}.{settings.base_domain}",
@@ -510,6 +517,7 @@ async def delete_site_route(
             ),
         )
 
+    mx.deleted_total.labels(reason=reason).inc()
     return None
 
 

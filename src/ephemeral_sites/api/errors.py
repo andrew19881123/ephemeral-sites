@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ephemeral_sites import auth, quota, slug, storage, validator
+from ephemeral_sites import metrics as mx
 
 from .middleware import REQUEST_ID_HEADER
 from .models import ErrorResponse
@@ -142,6 +143,7 @@ async def _handle_validation_error(
 
 
 async def _handle_quota_exceeded(request: Request, exc: quota.QuotaExceeded) -> JSONResponse:
+    mx.quota_reject_total.inc()
     return _error_json(
         request,
         status=507,

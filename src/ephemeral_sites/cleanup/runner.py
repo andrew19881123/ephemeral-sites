@@ -13,6 +13,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 
+from ephemeral_sites import metrics as mx
 from ephemeral_sites import storage
 from ephemeral_sites.config import Settings
 
@@ -88,6 +89,9 @@ def run_cleanup(
         with conn:
             conn.execute("DELETE FROM event_log WHERE timestamp < ?", (cutoff,))
         purged = int(count_before)
+
+    if expired_slugs:
+        mx.expired_total.inc(len(expired_slugs))
 
     if expired_slugs or purged > 0:
         log.info(
