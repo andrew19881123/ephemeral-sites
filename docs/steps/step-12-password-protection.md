@@ -2,7 +2,7 @@
 
 **Master spec sections**: [§5.2 password field](../SPEC.md), [§7.2 serving password-protected sites](../SPEC.md), [§11.3 test_server_password](../SPEC.md)
 **Roadmap entry**: [§16.1 step 12](../SPEC.md)
-**Status**: ⏳ Draft
+**Status**: ✅ Complete (2026-05-06, commit `a649c3e`)
 
 ---
 

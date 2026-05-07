@@ -349,8 +349,8 @@ The 18-step sequence is in [`docs/SPEC.md` §16.1](docs/SPEC.md). Current status
 | 9 | API CRUD (22 tests, 91% cov, POST+GET+DELETE+PATCH+LIST) | ✅ Done — `4326504` (mini-spec), `51288f1` (red), `b2b7b99` (feat) |
 | 10 | Runtime config injection (5 tests, carry-forward on replace) | ✅ Done — `0a022d6` (mini-spec+red+feat) |
 | 11 | Static server + SPA fallback + security headers (26 tests, 91.5% cov) | ✅ Done — `8db59de` |
-| 12 | Password protection | ⏳ Next |
-| 13 | Cleanup CronJob | Pending |
+| 12 | Password protection (9 tests, HTTP Basic against bcrypt hash) | ✅ Done — `a649c3e` |
+| 13 | Cleanup CronJob | ⏳ Next |
 | 14 | Metrics + health endpoints | Pending |
 | 15 | Helm chart | Pending |
 | 16 | CLI bash helpers | Pending |
