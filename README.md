@@ -2,7 +2,7 @@
 
 > Self-hosted single-user service to publish **ephemeral static SPA sites** from a ZIP upload, deployed on Kubernetes (target: k3s).
 
-![Status](https://img.shields.io/badge/status-WIP-yellow)
+![Status](https://img.shields.io/badge/status-v1.0--feature--complete-brightgreen)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
@@ -37,11 +37,35 @@ curl -X PUT "https://api.preview.your-domain.dev/api/v1/sites/my-demo" \
 
 ## Status
 
-🚧 **Work in progress — v1.0 under active development.**
+✅ **v1.0 feature-complete (17/18 roadmap steps done).**
 
-See [`docs/SPEC.md`](docs/SPEC.md) for the full technical specification and roadmap, and [`CLAUDE.md`](CLAUDE.md) for contributor / AI-agent development rules (spec-driven + TDD).
+All business logic, HTTP API, static server, cleanup, metrics, Helm chart, and
+CLI helpers are implemented with ≥ 91% test coverage. The remaining step
+(end-to-end testing on a real k3d cluster) is runtime infrastructure, not code.
 
-Current milestone: **Step 1 — scaffolding** ✅
+See [`docs/SPEC.md`](docs/SPEC.md) for the master spec, [`docs/steps/`](docs/steps/)
+for per-step mini-specs, and [`CLAUDE.md`](CLAUDE.md) for contributor rules.
+
+## API overview
+
+| Method | Path | Purpose |
+|---|---|---|
+| `PUT`    | `/api/v1/sites/{slug}` | Create or replace a site from a ZIP upload |
+| `POST`   | `/api/v1/sites`        | Create with auto-generated slug |
+| `GET`    | `/api/v1/sites/{slug}` | Fetch site metadata (hits, expires_at, ...) |
+| `PATCH`  | `/api/v1/sites/{slug}` | Mutate metadata: ttl / password / labels / allow_indexing |
+| `DELETE` | `/api/v1/sites/{slug}` | Remove a site (bearer OR one-shot `X-Delete-Token`) |
+| `GET`    | `/api/v1/sites`        | Paginated list (filter by label, sort by created_at/slug/...) |
+| `GET`    | `/healthz`             | Liveness probe |
+| `GET`    | `/readyz`              | Readiness (DB reachable + sites_root writable) |
+| `GET`    | `/metrics`             | Prometheus text format exporter |
+
+Served content (separate wildcard host) adds two synthetic endpoints:
+
+- `GET https://{slug}.<base_domain>/_ephemeral/info` → `{slug, expires_at, hits}`
+- `GET https://{slug}.<base_domain>/config.json`     → the `runtime_config` blob
+
+See [`docs/api-reference.md`](docs/api-reference.md) for request/response schemas.
 
 ## Tech stack
 
