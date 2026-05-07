@@ -78,6 +78,11 @@ class Settings(BaseSettings):
             ".otf",
             ".eot",
             ".pdf",
+            ".mp4",
+            ".webm",
+            ".mp3",
+            ".wav",
+            ".wasm",
         )
     )
 
