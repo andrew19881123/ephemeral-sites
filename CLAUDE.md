@@ -354,8 +354,8 @@ The 18-step sequence is in [`docs/SPEC.md` §16.1](docs/SPEC.md). Current status
 | 14 | Metrics + health endpoints (10 tests, Prometheus + healthz/readyz) | ✅ Done — `304a6b1` |
 | 15 | Helm chart (helm lint clean, 8 resources rendered) | ✅ Done — `fd79297` |
 | 16 | CLI bash helpers (deploy/delete/list/extend, pure bash+curl) | ✅ Done — `3bfdde2` |
-| 17 | README + docs | ⏳ Next |
-| 18 | E2E on k3d | Pending |
+| 17 | README + docs (api-reference, install, config, security, troubleshooting) | ✅ Done — `546b49b` |
+| 18 | E2E on k3d (run.sh + acceptance.sh + runbook) | ✅ Done |
 
 **Update this table after every step.** Out-of-date status is misinformation — worse than no status.
 
