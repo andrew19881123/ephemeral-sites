@@ -44,18 +44,22 @@ spec:
               value: /data/sites/.lock
             - name: EPHEMERAL_BASE_DOMAIN
               value: {{ .Values.app.baseDomain | quote }}
+            # NB: | int64 forces integer rendering. Without it, Helm's JSON
+            # normalisation coerces large numeric values (e.g. maxTotalStorageBytes
+            # defaulting to 40 GiB) to float64, and `| quote` then emits scientific
+            # notation like "4.294967296e+10" which pydantic_settings rejects.
             - name: EPHEMERAL_MAX_ZIP_SIZE
-              value: {{ .Values.limits.maxZipSize | quote }}
+              value: {{ .Values.limits.maxZipSize | int64 | quote }}
             - name: EPHEMERAL_MAX_FILES_PER_SITE
-              value: {{ .Values.limits.maxFilesPerSite | quote }}
+              value: {{ .Values.limits.maxFilesPerSite | int64 | quote }}
             - name: EPHEMERAL_MAX_TOTAL_STORAGE_BYTES
-              value: {{ .Values.limits.maxTotalStorageBytes | quote }}
+              value: {{ .Values.limits.maxTotalStorageBytes | int64 | quote }}
             - name: EPHEMERAL_MAX_DECOMPRESSION_RATIO
-              value: {{ .Values.limits.maxDecompressionRatio | quote }}
+              value: {{ .Values.limits.maxDecompressionRatio | int64 | quote }}
             - name: EPHEMERAL_DEFAULT_TTL_SECONDS
-              value: {{ .Values.limits.defaultTtlSeconds | quote }}
+              value: {{ .Values.limits.defaultTtlSeconds | int64 | quote }}
             - name: EPHEMERAL_MAX_TTL_SECONDS
-              value: {{ .Values.limits.maxTtlSeconds | quote }}
+              value: {{ .Values.limits.maxTtlSeconds | int64 | quote }}
             - name: EPHEMERAL_ALLOW_PERMANENT
               value: {{ .Values.limits.allowPermanent | quote }}
             - name: EPHEMERAL_API_KEYS
