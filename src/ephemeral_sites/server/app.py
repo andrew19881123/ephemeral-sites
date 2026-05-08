@@ -22,7 +22,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from ephemeral_sites import auth as auth_mod
-from ephemeral_sites.config import Settings
+from ephemeral_sites import db as db_mod
+from ephemeral_sites.config import Settings, get_settings
 
 from .headers import apply_security_headers
 from .resolver import resolve_slug_from_host
@@ -116,14 +117,25 @@ def _response_for_file(path: Path, *, allow_indexing: bool, no_cache: bool) -> R
 
 def create_server_app(
     *,
-    settings: Settings,
-    db_conn: sqlite3.Connection,
+    settings: Settings | None = None,
+    db_conn: sqlite3.Connection | None = None,
 ) -> FastAPI:
     """Build the static-content FastAPI app.
 
-    The DB connection is injected (not opened from settings) so tests can
-    share the same handle the API layer already populated.
+    Both parameters are optional so that ``uvicorn ... --factory`` can
+    invoke the factory with no arguments in production; tests still pass
+    explicit instances so they share state with the API layer.
+
+    When ``settings`` is ``None`` the process-wide env-driven
+    :class:`Settings` is used. When ``db_conn`` is ``None`` a read-only
+    SQLite connection is opened against ``settings.db_path`` (the static
+    server never writes).
     """
+    if settings is None:
+        settings = get_settings()
+    if db_conn is None:
+        db_conn = db_mod.open_db(Path(settings.db_path), read_only=True)
+
     app = FastAPI(title="ephemeral-sites static server", version="0.1.0")
 
     sites_root = Path(settings.sites_root)
