@@ -11,6 +11,8 @@ apiHost: api.preview.example.test      # REPLACE at deploy time
 ingress:
   enabled: true
   className: traefik
+  # Shared defaults (used by both the API and the wildcard ingress unless
+  # overridden under ingress.api / ingress.wildcard below).
   annotations: {}
   tls:
     enabled: true
@@ -18,6 +20,20 @@ ingress:
     certManager:
       clusterIssuer: letsencrypt-prod
     existingSecret: ""
+
+  # Per-host overrides (optional). Any omitted key inherits from the
+  # shared defaults above. Example:
+  #   api:
+  #     annotations:
+  #       traefik.ingress.kubernetes.io/router.middlewares: ns-ipwhitelist@kubernetescrd
+  #     tls:
+  #       enabled: true
+  #   wildcard:
+  #     annotations: {}
+  #     tls:
+  #       enabled: false   # serve SPAs plain HTTP; API still behind TLS
+  api: {}
+  wildcard: {}
 
 dns:
   provider: cloudflare

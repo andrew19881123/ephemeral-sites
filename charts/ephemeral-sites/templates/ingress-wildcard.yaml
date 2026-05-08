@@ -1,17 +1,19 @@
 {{- if .Values.ingress.enabled -}}
+{{- $annotations := include "ephemeral-sites.ingressAnnotations" (dict "ctx" . "host" "wildcard") | fromYaml -}}
+{{- $tlsEnabled := eq (include "ephemeral-sites.ingressTlsEnabled" (dict "ctx" . "host" "wildcard")) "true" -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "ephemeral-sites.fullname" . }}-wildcard
   labels:
     {{- include "ephemeral-sites.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
-  {{- if .Values.ingress.tls.enabled }}
+  {{- if $tlsEnabled }}
   tls:
     - hosts:
         - {{ .Values.wildcardHost | quote }}
