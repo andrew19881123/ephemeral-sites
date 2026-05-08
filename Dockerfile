@@ -17,7 +17,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /build
+# Build the venv under /app/.venv so the shebangs of console scripts
+# (uvicorn, etc.) resolve correctly in the runtime stage. If poetry
+# materialises the venv at a different path, its generated shebangs
+# would hard-code that path and break after COPY.
+WORKDIR /app
 
 COPY pyproject.toml poetry.lock* ./
 
@@ -37,7 +41,7 @@ RUN groupadd -g 10001 app \
 
 WORKDIR /app
 
-COPY --from=builder /build/.venv /app/.venv
+COPY --from=builder /app/.venv /app/.venv
 COPY --chown=app:app src/ /app/src/
 
 USER app
