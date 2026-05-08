@@ -34,3 +34,32 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/name: {{ include "ephemeral-sites.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{/*
+Resolve the effective ingress annotations for a given host slot.
+Usage: {{ include "ephemeral-sites.ingressAnnotations" (dict "ctx" . "host" "api") }}
+Precedence: ingress.<host>.annotations > ingress.annotations.
+*/}}
+{{- define "ephemeral-sites.ingressAnnotations" -}}
+{{- $ctx := .ctx -}}
+{{- $host := index ($ctx.Values.ingress | default dict) .host | default dict -}}
+{{- $ann := $host.annotations | default $ctx.Values.ingress.annotations -}}
+{{- toYaml $ann -}}
+{{- end -}}
+
+{{/*
+Resolve the effective ingress.tls.enabled for a given host slot.
+Usage: {{ include "ephemeral-sites.ingressTlsEnabled" (dict "ctx" . "host" "api") }}
+Returns "true" or "false" as a string — consumers compare with eq.
+Precedence: ingress.<host>.tls.enabled (if key present) > ingress.tls.enabled.
+*/}}
+{{- define "ephemeral-sites.ingressTlsEnabled" -}}
+{{- $ctx := .ctx -}}
+{{- $host := index ($ctx.Values.ingress | default dict) .host | default dict -}}
+{{- $hostTls := $host.tls | default dict -}}
+{{- if hasKey $hostTls "enabled" -}}
+{{- $hostTls.enabled -}}
+{{- else -}}
+{{- $ctx.Values.ingress.tls.enabled -}}
+{{- end -}}
+{{- end -}}
