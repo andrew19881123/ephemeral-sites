@@ -1,0 +1,162 @@
+name: release
+
+# On tag push (v*.*.*): build the Docker image, package the Helm chart,
+# push both to ghcr.io as OCI artifacts, and create a GitHub Release.
+#
+# After the first successful run, end users can install with only:
+#
+#   helm install ephemeral-sites \
+#     oci://ghcr.io/andrew19881123/charts/ephemeral-sites \
+#     --version 0.1.0 \
+#     -f values.yaml
+#
+# They only need to edit their own values.yaml.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (without leading v). Must match ^\\d+\\.\\d+\\.\\d+$"
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ephemeral-sites
+  CHART_NAME: ephemeral-sites
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive and validate version
+        id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            version="${REF_NAME#v}"
+          else
+            version="$INPUT_VERSION"
+          fi
+          # Strict semver to reject anything that could be a shell metachar.
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::invalid version '$version' (expected N.N.N)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------------------------------------------------------------
+      # Docker image
+      # ------------------------------------------------------------
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+            org.opencontainers.image.licenses=Apache-2.0
+
+      # ------------------------------------------------------------
+      # Helm chart (OCI)
+      # ------------------------------------------------------------
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Sync chart version/appVersion with tag
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          CHART_DIR: charts/${{ env.CHART_NAME }}
+        run: |
+          set -euo pipefail
+          sed -i "s/^version: .*/version: ${VERSION}/" "${CHART_DIR}/Chart.yaml"
+          sed -i "s/^appVersion: .*/appVersion: \"${VERSION}\"/" "${CHART_DIR}/Chart.yaml"
+          sed -i "s/^\(\s*tag:\s*\)\".*\"/\1\"${VERSION}\"/" "${CHART_DIR}/values.yaml"
+          cat "${CHART_DIR}/Chart.yaml"
+
+      - name: Helm lint
+        env:
+          CHART_DIR: charts/${{ env.CHART_NAME }}
+        run: helm lint "${CHART_DIR}"
+
+      - name: Helm package
+        env:
+          CHART_DIR: charts/${{ env.CHART_NAME }}
+        run: |
+          mkdir -p dist
+          helm package "${CHART_DIR}" --destination dist
+
+      - name: Helm push (OCI)
+        env:
+          REGISTRY_HOST: ${{ env.REGISTRY }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASS: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_ORG: ${{ github.repository_owner }}
+          CHART_FILE: dist/${{ env.CHART_NAME }}-${{ steps.ver.outputs.version }}.tgz
+        run: |
+          set -euo pipefail
+          printf '%s' "$REGISTRY_PASS" | \
+            helm registry login "$REGISTRY_HOST" -u "$REGISTRY_USER" --password-stdin
+          helm push "$CHART_FILE" "oci://${REGISTRY_HOST}/${REGISTRY_ORG}/charts"
+
+      # ------------------------------------------------------------
+      # GitHub Release
+      # ------------------------------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          name: "v${{ steps.ver.outputs.version }}"
+          generate_release_notes: true
+          files: |
+            dist/${{ env.CHART_NAME }}-${{ steps.ver.outputs.version }}.tgz
+          body: |
+            ## Installation
+
+            ```bash
+            # Docker image
+            docker pull ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.version }}
+
+            # Helm chart (OCI)
+            helm install ephemeral-sites \
+              oci://ghcr.io/${{ github.repository_owner }}/charts/${{ env.CHART_NAME }} \
+              --version ${{ steps.ver.outputs.version }} \
+              -n ephemeral-sites --create-namespace \
+              -f values-prod.yaml
+            ```
+
+            See [docs/installation.md](docs/installation.md) for full setup.
