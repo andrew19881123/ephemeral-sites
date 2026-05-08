@@ -61,6 +61,78 @@ helm install ephemeral-sites ./charts/ephemeral-sites \
   -n ephemeral-sites -f values-prod.yaml
 ```
 
+## Known deploy gotchas
+
+Lessons learned from a real k3s deploy (Traefik + Let's Encrypt HTTP-01, no
+cert-manager). None of these are chart bugs — they are non-obvious interactions
+between Helm values, Traefik's Kubernetes provider, and the app's env contract.
+Call them out before your first install.
+
+### 1. Traefik validates `tls.secretName` existence even when `certresolver` is set
+
+If you use `ingress.tls.mode: existing-secret` with the annotation
+`traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt`, Traefik
+still requires the referenced Secret to exist. When it is missing, Traefik logs
+`Error configuring TLS: secret ... does not exist` and skips the entire router
+— the HTTPS request then falls through to whichever other router matches the
+SNI, typically the wildcard, producing a misleading 404 from the static
+backend.
+
+Workaround: pre-create a throwaway self-signed TLS secret with the same name.
+Traefik ignores the contents once the ACME cert is issued via `certresolver`.
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+  -keyout /tmp/k.pem -out /tmp/c.pem \
+  -subj "/CN=placeholder"
+kubectl -n ephemeral-sites create secret tls <your-existingSecret-name> \
+  --cert=/tmp/c.pem --key=/tmp/k.pem
+```
+
+### 2. Wildcard Ingress beats literal Ingress on Traefik's default priority
+
+The chart creates two Ingresses sharing the same parent domain:
+`api.preview.<domain>` (literal) and `*.preview.<domain>` (wildcard). Traefik
+translates the wildcard into a `HostRegexp(...)` rule that is **longer** than
+the literal `Host(...)` rule. Since its default router priority is
+`len(rule)`, the wildcard wins and captures every request — including the
+ones intended for the API — routing them to the static container which
+responds 404 `{"error":"not_found"}`.
+
+Workaround: force the API ingress priority explicitly via
+`ingress.api.annotations`:
+
+```yaml
+ingress:
+  api:
+    annotations:
+      traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+      traefik.ingress.kubernetes.io/router.priority: "1000"
+```
+
+Any value well above the wildcard's regexp length (~50 on a typical nip.io
+domain) works. Debug with
+`kubectl -n kube-system logs deploy/traefik | grep routerName`.
+
+### 3. `API_KEYS` must be `name:secret` comma-separated
+
+The env var is parsed by `auth.parse_api_keys_env` (master spec §5.1). A raw
+token without the `name:` prefix raises `InvalidApiKeysEnv: API_KEYS entry is
+missing ':' separator between name and secret` and every authenticated request
+returns 500.
+
+Correct:
+
+```bash
+kubectl -n ephemeral-sites create secret generic ephemeral-sites-auth \
+  --from-literal=API_KEYS="main:$(openssl rand -hex 32)"
+# Multiple keys allowed, comma-separated:
+#   API_KEYS="main:<key>,ci:<key>"
+```
+
+The bearer token sent by clients is only the `<key>` part (not the `name:`
+prefix).
+
 ## Upgrade
 
 ```bash
