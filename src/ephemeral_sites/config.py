@@ -10,6 +10,8 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ephemeral_sites.server.headers import DEFAULT_CSP
+
 __all__ = ["Settings", "get_settings"]
 
 
@@ -51,6 +53,14 @@ class Settings(BaseSettings):
     # --- misc ---
     base_domain: str = Field(default="preview.example.test")
     bcrypt_rounds: int = Field(default=12)
+    csp: str = Field(
+        default=DEFAULT_CSP,
+        description=(
+            "Content-Security-Policy header value applied by the static "
+            "server to every 200 response. Override via EPHEMERAL_CSP / "
+            "Helm value app.csp for per-deployment customization."
+        ),
+    )
 
     # --- validator allowed extensions (master spec §9) ---
     allowed_extensions: tuple[str, ...] = Field(

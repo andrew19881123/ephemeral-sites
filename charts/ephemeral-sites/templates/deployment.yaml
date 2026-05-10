@@ -107,6 +107,10 @@ spec:
               value: /data/sites
             - name: EPHEMERAL_BASE_DOMAIN
               value: {{ .Values.app.baseDomain | quote }}
+            {{- with .Values.app.csp }}
+            - name: EPHEMERAL_CSP
+              value: {{ . | quote }}
+            {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
           securityContext:

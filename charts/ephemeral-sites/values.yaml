@@ -91,6 +91,10 @@ app:
   tolerations: []
   affinity: {}
   baseDomain: preview.example.test   # REPLACE — usually == domain
+  # Content-Security-Policy applied by the static server to every 200 response.
+  # Empty string -> use the in-app permissive default (DEFAULT_CSP) which allows
+  # external HTTPS CDN content. See src/ephemeral_sites/server/headers.py.
+  csp: ""
 
 # ---- Auth ----
 auth:

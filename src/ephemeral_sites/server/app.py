@@ -103,11 +103,13 @@ def _unauthorized_response(slug: str) -> JSONResponse:
     return response
 
 
-def _response_for_file(path: Path, *, allow_indexing: bool, no_cache: bool) -> Response:
+def _response_for_file(
+    path: Path, *, allow_indexing: bool, no_cache: bool, csp: str | None = None
+) -> Response:
     data = path.read_bytes()
     ctype, _ = mimetypes.guess_type(path.name)
     response = Response(content=data, media_type=ctype or "application/octet-stream")
-    apply_security_headers(response, allow_indexing=allow_indexing)
+    apply_security_headers(response, allow_indexing=allow_indexing, csp=csp)
     if no_cache:
         response.headers["Cache-Control"] = "no-cache"
     else:
@@ -172,7 +174,7 @@ def create_server_app(
                 "hits": row["hits"] or 0,
             }
             response = JSONResponse(body)
-            apply_security_headers(response, allow_indexing=False)
+            apply_security_headers(response, allow_indexing=False, csp=settings.csp)
             response.headers["Cache-Control"] = "no-cache"
             return response
 
@@ -185,7 +187,9 @@ def create_server_app(
             except (TypeError, ValueError):
                 decoded = rc
             response = JSONResponse(decoded)
-            apply_security_headers(response, allow_indexing=bool(row["allow_indexing"]))
+            apply_security_headers(
+                response, allow_indexing=bool(row["allow_indexing"]), csp=settings.csp
+            )
             response.headers["Cache-Control"] = "no-cache"
             return response
 
@@ -206,13 +210,19 @@ def create_server_app(
                 target,
                 allow_indexing=allow_indexing,
                 no_cache=is_index_like,
+                csp=settings.csp,
             )
 
         # File missing — SPA fallback?
         if spa_mode and not is_asset_path(normalized):
             index_path = site_dir / "index.html"
             if index_path.is_file():
-                return _response_for_file(index_path, allow_indexing=allow_indexing, no_cache=True)
+                return _response_for_file(
+                    index_path,
+                    allow_indexing=allow_indexing,
+                    no_cache=True,
+                    csp=settings.csp,
+                )
 
         return JSONResponse({"error": "not_found"}, status_code=404)
 

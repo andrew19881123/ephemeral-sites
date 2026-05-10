@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ephemeral-sites"
-version = "0.1.0"
+version = "0.2.3"
 description = "Self-hosted single-user service to publish ephemeral static SPA sites from a ZIP upload on Kubernetes."
 authors = ["Andrea Veronesi <andrew19881123@users.noreply.github.com>"]
 license = "Apache-2.0"

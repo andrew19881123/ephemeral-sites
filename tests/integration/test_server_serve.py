@@ -83,8 +83,37 @@ def test_security_headers_noindex_by_default(server_client):
     assert r.headers.get("X-Content-Type-Options") == "nosniff"
     assert r.headers.get("X-Frame-Options") == "SAMEORIGIN"
     assert "Referrer-Policy" in r.headers
-    assert "Content-Security-Policy" in r.headers
+    csp = r.headers.get("Content-Security-Policy", "")
+    # External HTTPS CDN content must be allowed for uploaded SPAs.
+    assert "https:" in csp
+    assert "script-src" in csp
     assert "noindex" in r.headers.get("X-Robots-Tag", "")
+
+
+def test_csp_setting_override_propagates_to_response(
+    api_client, auth_headers, spa_zip_with_static, settings, monkeypatch
+):
+    """Settings.csp injected at app-construction time appears on every
+    served response — proves the EPHEMERAL_CSP / app.csp Helm wiring path."""
+    from fastapi.testclient import TestClient
+
+    from ephemeral_sites.api import deps as api_deps
+    from ephemeral_sites.server import app as server_app_module
+
+    api_client.put(
+        "/api/v1/sites/cspsite",
+        headers=auth_headers,
+        files={"file": ("spa.zip", spa_zip_with_static, "application/zip")},
+    )
+    conn = api_deps._DB_CACHE[settings.db_path]
+
+    custom = "default-src 'self' https://my.cdn.example;"
+    monkeypatch.setattr(settings, "csp", custom)
+    srv = server_app_module.create_server_app(settings=settings, db_conn=conn)
+    client = TestClient(srv)
+    r = client.get("/", headers={"Host": "cspsite.preview.test"})
+    assert r.status_code == 200
+    assert r.headers.get("Content-Security-Policy") == custom
 
 
 def test_unknown_host_returns_404(server_client):
